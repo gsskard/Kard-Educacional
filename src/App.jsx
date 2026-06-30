@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-const API = (import.meta.env.VITE_N8N_BASE || '').replace(/\/$/, '')
+const API = (import.meta.env.VITE_N8N_BASE || 'https://n8n.srv1759869.hstgr.cloud/webhook').replace(/\/$/, '')
 
 const STAGES = [
   { key: 'Educativo', label: 'Educativo', color: '#639922' },
