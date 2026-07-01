@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listarContatos, enriquecerEmpresa } from '../api/n8n'
+import { listarContatos, listarEmpresas, enriquecerEmpresa } from '../api/n8n'
 import PillStatus from '../componentes/PillStatus'
 import CompanyLogo from '../componentes/CompanyLogo'
 
 // Tela de Contatos (RF-33 a RF-38): a "casa" dos dados que retroalimentam
-// o sistema. Lista os contatos do banco (via n8n), com busca e acompanhamento.
-// O enriquecimento é por EMPRESA (acha e-mails de RH na Snov) — dá pra disparar
-// pela empresa do contato, aqui ou na tela Empresas. Roda no n8n.
+// o sistema. Lista os contatos (tabela cobranca) e CRUZA com as empresas já
+// enriquecidas (tabela empresas) pela empresa do contato — assim o logo e o
+// status de enriquecimento aparecem aqui também, conectando as duas abas.
+// O enriquecimento é por EMPRESA (Hunter) e roda no n8n.
+
+const chave = (nome) => String(nome || '').trim().toLowerCase()
 
 export default function Contatos() {
   const [rows, setRows] = useState([])
+  const [empresas, setEmpresas] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [busca, setBusca] = useState('')
@@ -18,11 +22,31 @@ export default function Contatos() {
 
   async function carregar() {
     setLoading(true); setErro('')
-    try { setRows(await listarContatos()) }
-    catch (e) { setErro('Não consegui carregar do n8n (' + e.message + ')') }
-    finally { setLoading(false) }
+    try {
+      // busca contatos e empresas juntos (empresas pode falhar sem quebrar a tela)
+      const [contatos, emps] = await Promise.all([
+        listarContatos(),
+        listarEmpresas().catch(() => []),
+      ])
+      setRows(contatos)
+      setEmpresas(emps)
+    } catch (e) {
+      setErro('Não consegui carregar do n8n (' + e.message + ')')
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { carregar() }, [])
+
+  // Mapa empresa (normalizada) -> dados enriquecidos, para cruzar com os contatos.
+  const empresaPorNome = useMemo(() => {
+    const m = new Map()
+    for (const e of empresas) {
+      const k = chave(e.empresa)
+      if (k) m.set(k, e)
+    }
+    return m
+  }, [empresas])
 
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -40,16 +64,16 @@ export default function Contatos() {
     })
   }
 
-  // Enriquece as EMPRESAS (únicas) dos contatos escolhidos.
+  // Enriquece as EMPRESAS (únicas) dos contatos escolhidos, via Hunter.
   async function enriquecerEmpresasDe(lista) {
-    const empresas = [...new Map(
-      lista.filter((r) => r.empresa).map((r) => [r.empresa, r])
+    const alvo = [...new Map(
+      lista.filter((r) => r.empresa).map((r) => [chave(r.empresa), r])
     ).values()]
-    if (empresas.length === 0) { setMsg('Selecione contatos que tenham empresa.'); return }
+    if (alvo.length === 0) { setMsg('Selecione contatos que tenham empresa.'); return }
     try {
-      setMsg('Enriquecendo ' + empresas.length + ' empresa(s) via Snov...')
-      await Promise.all(empresas.map((r) => enriquecerEmpresa(r.empresa, r.cnpj_empregador || r.cnpj)))
-      setMsg('Enriquecimento solicitado. Veja o resultado na tela Empresas.')
+      setMsg('Enriquecendo ' + alvo.length + ' empresa(s) via Hunter...')
+      await Promise.all(alvo.map((r) => enriquecerEmpresa(r.empresa, r.cnpj_empregador || r.cnpj)))
+      setMsg('Enriquecimento concluído. O logo e os e-mails já aparecem aqui e na aba Empresas.')
       carregar()
     } catch (err) {
       setMsg('⏳ ' + err.message)
@@ -59,7 +83,7 @@ export default function Contatos() {
   return (
     <div>
       <header className="pagina-head"><h1>Contatos</h1></header>
-      <p className="ajuda">Base de contatos que retroalimenta o sistema (RF-15/33). O enriquecimento Snov é uma ação aqui dentro (RF-36).</p>
+      <p className="ajuda">Base de contatos que retroalimenta o sistema (RF-15/33). O enriquecimento (Hunter) é por empresa e reflete na aba Empresas (RF-36).</p>
 
       {erro && <div className="banner">{erro}</div>}
       {msg && <div className="banner">{msg}</div>}
@@ -85,23 +109,30 @@ export default function Contatos() {
             </tr>
           </thead>
           <tbody>
-            {visiveis.map((r, i) => (
-              <tr key={r.id ?? i}>
-                <td><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
-                <td>{r.nome || '—'}</td>
-                <td>
-                  <span className="empresa-cel">
-                    <CompanyLogo dominio={r.dominio} logo={r.logo} nome={r.empresa} size={24} />
-                    {r.empresa || '—'}
-                  </span>
-                </td>
-                <td>{r.email || '—'}</td>
-                <td>{r.etapa || '—'}</td>
-                <td><PillStatus status={r.status_envio} /></td>
-                <td>{r.enriquecido_em ? ('em ' + r.enriquecido_em) : <span className="ajuda">não</span>}</td>
-                <td><button className="btn-mini" onClick={() => enriquecerEmpresasDe([r])}>enriquecer</button></td>
-              </tr>
-            ))}
+            {visiveis.map((r, i) => {
+              const emp = empresaPorNome.get(chave(r.empresa))
+              return (
+                <tr key={r.id ?? i}>
+                  <td><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
+                  <td>{r.nome || '—'}</td>
+                  <td>
+                    <span className="empresa-cel">
+                      <CompanyLogo dominio={emp?.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
+                      {r.empresa || '—'}
+                    </span>
+                  </td>
+                  <td>{r.email || '—'}</td>
+                  <td>{r.etapa || '—'}</td>
+                  <td><PillStatus status={r.status_envio} /></td>
+                  <td>
+                    {emp
+                      ? <span className="pill pill-ok">enriquecida{emp.enriquecido_em ? ' ' + emp.enriquecido_em : ''}</span>
+                      : <span className="ajuda">não</span>}
+                  </td>
+                  <td><button className="btn-mini" onClick={() => enriquecerEmpresasDe([r])}>enriquecer</button></td>
+                </tr>
+              )
+            })}
             {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhum contato.</td></tr>}
           </tbody>
         </table>
