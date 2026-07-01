@@ -21,6 +21,7 @@ export default function Empresas() {
   const [msg, setMsg] = useState('')
   const [view, setView] = useState('cards')       // 'cards' | 'tabela'
   const [expandido, setExpandido] = useState(() => new Set())
+  const [emLote, setEmLote] = useState(false)
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -50,6 +51,27 @@ export default function Empresas() {
     })
   }
 
+  // Enriquece TODAS as empresas. Sem forçar: as que já estão no cache Redis
+  // não gastam crédito; as que faltam (ex.: sem localização) vão ao Hunter.
+  async function enriquecerTudo() {
+    if (!window.confirm(`Enriquecer as ${rows.length} empresas? As que já estão no cache não gastam crédito; as novas consultam o Hunter.`)) return
+    setEmLote(true); setMsg('')
+    try {
+      let n = 0
+      for (const e of rows) {
+        setMsg(`Enriquecendo ${++n}/${rows.length}: ${e.empresa}…`)
+        await enriquecerEmpresa(e.empresa, e.cnpj)
+        await new Promise((r) => setTimeout(r, 800))
+      }
+      setMsg('Enriquecimento em lote concluído. Clique em Atualizar em instantes.')
+      carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    } finally {
+      setEmLote(false)
+    }
+  }
+
   // reenriquecer força nova busca no Hunter (ignora o cache Redis)
   async function enriquecer(e) {
     try {
@@ -73,6 +95,9 @@ export default function Empresas() {
       <div className="toolbar">
         <input placeholder="Buscar empresa, CNPJ, domínio ou local..." value={busca} onChange={(e) => setBusca(e.target.value)} />
         <button className="btn-refresh" onClick={carregar}>Atualizar</button>
+        <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
+          {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
+        </button>
         <div className="view-toggle">
           <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Cartões</button>
           <button className={view === 'tabela' ? 'ativo' : ''} onClick={() => setView('tabela')}>Tabela</button>
