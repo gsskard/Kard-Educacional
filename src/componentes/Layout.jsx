@@ -32,7 +32,7 @@ export default function Layout({ rota, children }) {
       <aside className="sidebar">
         <div className="brand">
           <Logo />
-          <div className="brand-sub">Portal Régua</div>
+          <div className="brand-sub">Backoffice</div>
         </div>
         <nav>
           {MENU.map((item) => (
