@@ -171,8 +171,24 @@ input:focus, select:focus { outline: none; border-color: var(--verde); box-shado
 .empresa-linha a:hover { text-decoration: underline; }
 .empresa-rh { margin-top: 12px; }
 .empresa-rh .chave { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-.rh-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; padding: 4px 0; }
+.rh-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--borda); }
+.rh-info { display: flex; flex-direction: column; }
+.rh-cargo { color: var(--muted); font-size: 11px; }
 .empresa-cel { display: inline-flex; align-items: center; gap: 8px; }
+
+/* alternância de visão (Cartões / Tabela) */
+.view-toggle { display: inline-flex; border: 1px solid var(--borda-forte); border-radius: 10px; overflow: hidden; }
+.view-toggle button { background: var(--card); border: none; padding: 9px 16px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.view-toggle button + button { border-left: 1px solid var(--borda-forte); }
+.view-toggle button.ativo { background: var(--verde-50); color: var(--verde-600); }
+
+/* tabela de empresas com linha expansível */
+.linha-empresa { cursor: pointer; }
+.linha-empresa:hover { background: #fafbfe; }
+.linha-detalhe > td { background: #f7f9fc; padding: 0 !important; }
+table.sub { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.sub th { background: #eef1f6; color: var(--muted); font-weight: 600; padding: 8px 12px; text-align: left; }
+table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 
 /* ===================================================================
    Interações (movimento / feedback)
