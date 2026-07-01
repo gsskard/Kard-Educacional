@@ -154,6 +154,26 @@ input:focus, select:focus { outline: none; border-color: var(--verde); box-shado
 .empty { font-size: 13px; color: var(--muted); text-align: center; padding: 16px 0; }
 .loading { color: var(--muted); padding: 24px; text-align: center; }
 
+/* ===== Empresas (enriquecimento) ===== */
+.empresas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.empresa-card { background: var(--card); border: 1px solid var(--borda); border-radius: 16px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(30,43,77,.04); }
+.empresa-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.empresa-nome { font-size: 16px; font-weight: 700; color: var(--navy); }
+.empresa-cnpj { font-size: 12px; color: var(--muted); }
+.logo-fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--verde-50); color: var(--verde-600); font-weight: 700;
+  border: 1px solid var(--borda);
+}
+.empresa-linha { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px dashed var(--borda); }
+.empresa-linha .chave { color: var(--muted); }
+.empresa-linha a { color: var(--verde-600); text-decoration: none; }
+.empresa-linha a:hover { text-decoration: underline; }
+.empresa-rh { margin-top: 12px; }
+.empresa-rh .chave { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.rh-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; padding: 4px 0; }
+.empresa-cel { display: inline-flex; align-items: center; gap: 8px; }
+
 /* ===================================================================
    Interações (movimento / feedback)
    =================================================================== */
@@ -163,13 +183,14 @@ input:focus, select:focus { outline: none; border-color: var(--verde); box-shado
 
 /* transições suaves nos elementos interativos */
 .menu-item, .btn-primario, .btn-refresh, .btn-secundario, .btn-mini,
-.metric, .funil-card, .secao, .card, input, select, .pill, .usuario {
+.metric, .funil-card, .secao, .card, .empresa-card, input, select, .pill, .usuario {
   transition: background .18s ease, color .18s ease, box-shadow .2s ease,
               transform .15s ease, border-color .18s ease;
 }
 
 /* animação de entrada dos blocos */
-.pagina-head, .secao, .metric, .funil-card { animation: fadeUp .35s ease both; }
+.pagina-head, .secao, .metric, .funil-card, .empresa-card { animation: fadeUp .35s ease both; }
+.empresa-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(30,43,77,.10); }
 .metrics .metric:nth-child(2) { animation-delay: .05s; }
 .metrics .metric:nth-child(3) { animation-delay: .10s; }
 .metrics .metric:nth-child(4) { animation-delay: .15s; }

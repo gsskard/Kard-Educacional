@@ -8,6 +8,7 @@ const MENU = [
   { rota: 'educacional', label: 'Educacional' },
   { rota: 'cobranca', label: 'Cobrança' },
   { rota: 'contatos', label: 'Contatos' },
+  { rota: 'empresas', label: 'Empresas' },
   { rota: 'configuracoes', label: 'Configurações' },
 ]
 

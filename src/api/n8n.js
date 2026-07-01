@@ -57,10 +57,31 @@ export async function dispararEtapa(etapa, modelo) {
   })
 }
 
-// RF-36: enriquecer um contato via Snov (ação dentro da tela de Contatos).
-export async function enriquecerContato(id) {
-  // TODO(n8n): criar webhook POST /crm-cobranca/enriquecer
-  throw new Error('PENDENTE: criar webhook de enriquecimento Snov no n8n (RF-36)')
+// RF-33/38: lista as EMPRESAS enriquecidas (tabela `empresas` no n8n).
+// Cada empresa traz: cnpj, dominio, site, logo, e-mails de RH e validade.
+// `emails_rh` chega como texto JSON (o banco guarda string) → convertemos em lista.
+export async function listarEmpresas() {
+  const data = await req('/crm-cobranca/empresas')
+  const lista = Array.isArray(data) ? data : (data?.data || [])
+  return lista.map((e) => ({ ...e, emails_rh: parseEmails(e.emails_rh) }))
+}
+
+function parseEmails(valor) {
+  if (Array.isArray(valor)) return valor
+  if (typeof valor === 'string' && valor.trim()) {
+    try { return JSON.parse(valor) } catch { return [] }
+  }
+  return []
+}
+
+// RF-09/10/36/37: enriquece UMA empresa via Snov (acha domínio → e-mails de RH
+// → valida) e grava na tabela `empresas`. Recebe nome e (se houver) cnpj.
+export async function enriquecerEmpresa(empresa, cnpj) {
+  return req('/crm-cobranca/enriquecer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ empresa, cnpj }),
+  })
 }
 
 // RF-39/40: eventos de e-mail (enviado/aberto/clicado) por contato/etapa/inbox.

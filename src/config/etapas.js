@@ -10,11 +10,12 @@
 // (chaveConfig) que aponta para onde essa config será lida depois.
 
 // Formato do arquivo de Cobrança (Anexo A do Claude2.md).
+// `cnpj_empregador` é a coluna nova para o enriquecimento (CNPJ vem no arquivo).
 export const COLUNAS_COBRANCA = [
   'contrato', 'cpf', 'matricula_cliente', 'qtd_parcelas_aberto', 'valor_total_saldo',
-  'dt_vencimento', 'maior_atraso', 'cd_convenio', 'empregador', 'nome_cliente',
-  'celular', 'endereco_cliente', 'Bairro', 'cidade', 'estado', 'cep', 'email',
-  'CEL_2', 'faixa_atraso',
+  'dt_vencimento', 'maior_atraso', 'cd_convenio', 'empregador', 'cnpj_empregador',
+  'nome_cliente', 'celular', 'endereco_cliente', 'Bairro', 'cidade', 'estado', 'cep',
+  'email', 'CEL_2', 'faixa_atraso',
 ]
 
 // Formato do arquivo Educacional (Anexo B — ainda não fornecido, [A VALIDAR]).
