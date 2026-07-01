@@ -3,14 +3,16 @@ import { useState } from 'react'
 // Mostra o logo/ícone da empresa a partir do domínio. Tenta várias fontes
 // grátis em ordem (a primeira que carregar vence); se todas falharem — ou não
 // houver domínio —, mostra as iniciais num círculo.
-//   1) unavatar.io  — agrega vários provedores, melhor cobertura
-//   2) Google       — bem tolerante a rede corporativa
-//   3) DuckDuckGo   — ícones em boa resolução
+//   1) Hunter (logos.hunter.io) — logo real da empresa, URL pública (sem chave)
+//   2) unavatar.io  — agrega vários provedores
+//   3) Google       — bem tolerante a rede corporativa
+//   4) DuckDuckGo   — ícones em boa resolução
 // Se a empresa tiver uma URL de logo salva (campo `logo`), ela vem primeiro.
 export default function CompanyLogo({ dominio, logo, nome, size = 40 }) {
   const fontes = []
   if (logo) fontes.push(logo)
   if (dominio) {
+    fontes.push(`https://logos.hunter.io/${dominio}`)
     fontes.push(`https://unavatar.io/${dominio}`)
     fontes.push(`https://www.google.com/s2/favicons?domain=${dominio}&sz=128`)
     fontes.push(`https://icons.duckduckgo.com/ip3/${dominio}.ico`)
