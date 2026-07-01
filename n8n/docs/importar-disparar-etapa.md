@@ -1,8 +1,8 @@
 # Workflows de Etapa — Importar e Disparar
 
-Dois workflows **reutilizáveis** que atendem as 3 telas espelho (Educacional 1,
-Educacional 2, Cobrança). Cada tela chama passando a **sua etapa** — não há um
-workflow por etapa, é a mesma lógica parametrizada.
+Dois workflows **reutilizáveis** que atendem as telas espelho (Educacional,
+Cobrança). Cada tela chama passando a **sua etapa** (e o **modelo** de e-mail) —
+não há um workflow por etapa, é a mesma lógica parametrizada.
 
 Modelo de fluxo: **"cada tela dispara sozinha"** (upload por etapa → disparo por etapa),
 sem régua automática entre etapas.
@@ -15,7 +15,7 @@ Arquivo: `workflows/ia-cobranca-importar-etapa.json`
 Recebe a carga que o painel já leu e validou no navegador, e grava na Data Table.
 
 - **Importar (POST)** — webhook `POST /crm-cobranca/importar`, CORS liberado.
-  Corpo esperado: `{ "etapa": "Educacional 1", "registros": [ {..}, {..} ] }`.
+  Corpo esperado: `{ "etapa": "Educacional", "registros": [ {..}, {..} ] }`.
 - **Normalizar por etapa** (Code) — para cada registro: valida e-mail, converte
   `valor` (aceita `1.234,56`) e `vencimento` (aceita `dd/mm/aaaa`), e define
   `etapa` = a etapa recebida. Aceita tanto o formato educacional
@@ -32,10 +32,12 @@ Arquivo: `workflows/ia-cobranca-disparar-etapa.json`
 Dispara o e-mail de **uma** etapa para todos os contatos dela.
 
 - **Disparar (POST)** — webhook `POST /crm-cobranca/disparar`, CORS liberado.
-  Corpo esperado: `{ "etapa": "Cobrança" }`.
+  Corpo esperado: `{ "etapa": "Educacional", "modelo": "lembrete" }`.
+  Modelos: Educacional → `lembrete` (amigável) ou `reforco` (segundo lembrete);
+  Cobrança → `padrao`.
 - **Ler contatos da etapa** (Data Table) — busca todos com `etapa` igual à recebida.
-- **Montar email da etapa** (Code) — monta assunto + HTML. Se a etapa começa com
-  "Educacional", usa o texto amigável; senão, o texto firme de cobrança.
+- **Montar email da etapa** (Code) — monta assunto + HTML conforme o **modelo**
+  recebido: `lembrete` (amigável), `reforco` (segundo lembrete) ou `padrao` (cobrança).
 - **Disparar CyberTalk** (HTTP) — envia pela API da CyberTalk (mesmo padrão dos
   outros disparos; `Ignore SSL Issues` ligado).
 - **Marcar envio** (Data Table) — grava `status_envio`, `cbtk_id` e `ultimo_envio`.

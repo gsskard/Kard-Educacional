@@ -40,7 +40,7 @@ export default function Dashboard() {
         <div className="funil">
           {ETAPAS_ORDEM.map((chave) => {
             const et = ETAPAS[chave]
-            const qtd = rows.filter((r) => (r.etapa || 'Educacional 1') === et.valorEtapa).length
+            const qtd = rows.filter((r) => (r.etapa || 'Educacional') === et.valorEtapa).length
             return (
               <button key={chave} className="funil-card" style={{ borderTopColor: et.cor }} onClick={() => irPara(chave)}>
                 <div className="funil-num" style={{ color: et.cor }}>{qtd}</div>

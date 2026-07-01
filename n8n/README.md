@@ -30,7 +30,7 @@ n8n/
 | **ETL CSV** | `workflows/ia-cobranca-etl-csv.json` | (antigo) Importa contatos de um CSV via formulário | [docs/etl-csv.md](docs/etl-csv.md) |
 | **Régua** | `workflows/ia-cobranca-regua.json` | (antigo/inerte) Régua automática — substituída pelo disparo por etapa | [docs/regua.md](docs/regua.md) |
 
-> **Fluxo atual (01/07/2026):** etapas `Educacional 1 / Educacional 2 / Cobrança`;
+> **Fluxo atual (01/07/2026):** etapas `Educacional / Cobrança`;
 > cada tela **importa e dispara a sua** (workflows *Importar/Disparar por Etapa*).
 > O **ETL CSV** e a **Régua** são do modelo antigo — a Régua ficou inerte após o
 > rename (não acha mais `Educativo`).

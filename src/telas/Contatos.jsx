@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarContatos, enriquecerContato } from '../api/n8n'
+import PillStatus from '../componentes/PillStatus'
 
 // Tela de Contatos (RF-33 a RF-38): a "casa" dos dados que retroalimentam
 // o sistema. Lista os contatos do banco (via n8n), com busca, acompanhamento
@@ -85,7 +86,7 @@ export default function Contatos() {
                 <td>{r.empresa || '—'}</td>
                 <td>{r.email || '—'}</td>
                 <td>{r.etapa || '—'}</td>
-                <td>{r.status_envio || '—'}</td>
+                <td><PillStatus status={r.status_envio} /></td>
                 <td>{r.enriquecido_em ? ('em ' + r.enriquecido_em) : <span className="pendente">não</span>}</td>
                 <td><button className="btn-mini" onClick={() => enriquecer([r.id])}>enriquecer</button></td>
               </tr>

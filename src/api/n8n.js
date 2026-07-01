@@ -47,13 +47,13 @@ export async function importarCarga(etapa, registros) {
   })
 }
 
-// RF-19: dispara os e-mails de uma etapa (cada tela dispara a sua).
-// Workflow: "IA - Cobrança - Disparar por Etapa".
-export async function dispararEtapa(etapa) {
+// RF-19: dispara os e-mails de uma etapa (cada tela dispara a sua),
+// usando o modelo de e-mail escolhido. Workflow: "IA - Cobrança - Disparar por Etapa".
+export async function dispararEtapa(etapa, modelo) {
   return req('/crm-cobranca/disparar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ etapa }),
+    body: JSON.stringify({ etapa, modelo }),
   })
 }
 

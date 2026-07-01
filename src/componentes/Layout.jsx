@@ -1,46 +1,67 @@
 import { irPara } from '../hooks/useHashRoute'
 
-// Menu lateral + cabeçalho. Envolve todas as telas (RF-30: painel/CRM).
-// O item "ativo" é destacado conforme a rota atual.
+// Layout no estilo do "Portal Super Crédito" da Kard:
+// sidebar branca com logo + menu (chevron), topo com breadcrumb e usuário.
 
 const MENU = [
-  { rota: 'dashboard', label: 'Dashboard', icone: '▦' },
-  { tipo: 'grupo', label: 'Régua (etapas)' },
-  { rota: 'educacional-1', label: 'Educacional 1', icone: '①' },
-  { rota: 'educacional-2', label: 'Educacional 2', icone: '②' },
-  { rota: 'cobranca', label: 'Cobrança', icone: '③' },
-  { tipo: 'grupo', label: 'Dados' },
-  { rota: 'contatos', label: 'Contatos', icone: '☺' },
-  { rota: 'configuracoes', label: 'Configurações', icone: '⚙' },
+  { rota: 'dashboard', label: 'Dashboard' },
+  { rota: 'educacional', label: 'Educacional' },
+  { rota: 'cobranca', label: 'Cobrança' },
+  { rota: 'contatos', label: 'Contatos' },
+  { rota: 'configuracoes', label: 'Configurações' },
 ]
 
+function Logo() {
+  return (
+    <div className="logo">
+      <span className="logo-mark" />
+      <span className="logo-word">kard</span>
+    </div>
+  )
+}
+
+const USUARIO = 'Gabriella'
+
 export default function Layout({ rota, children }) {
+  const atual = MENU.find((m) => m.rota === rota)
+  const tituloAtual = atual ? atual.label : 'Dashboard'
+
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-nome">Kard CRM</div>
-          <div className="brand-sub">Régua educativa e cobrança</div>
+          <Logo />
+          <div className="brand-sub">Portal Régua</div>
         </div>
         <nav>
-          {MENU.map((item, i) =>
-            item.tipo === 'grupo' ? (
-              <div key={i} className="menu-grupo">{item.label}</div>
-            ) : (
-              <button
-                key={item.rota}
-                className={'menu-item' + (rota === item.rota ? ' ativo' : '')}
-                onClick={() => irPara(item.rota)}
-              >
-                <span className="menu-icone">{item.icone}</span>
-                {item.label}
-              </button>
-            )
-          )}
+          {MENU.map((item) => (
+            <button
+              key={item.rota}
+              className={'menu-item' + (rota === item.rota ? ' ativo' : '')}
+              onClick={() => irPara(item.rota)}
+            >
+              <span>{item.label}</span>
+              <span className="chevron">›</span>
+            </button>
+          ))}
         </nav>
         <div className="sidebar-rodape">Fase 1 — MVP</div>
       </aside>
-      <main className="conteudo">{children}</main>
+
+      <div className="main-wrap">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span className="crumb">Kard CRM</span>
+            <span className="crumb-sep">›</span>
+            <span className="crumb-atual">{tituloAtual}</span>
+          </div>
+          <div className="usuario">
+            <span className="usuario-icone">👤</span>
+            {USUARIO}
+          </div>
+        </header>
+        <main className="conteudo">{children}</main>
+      </div>
     </div>
   )
 }

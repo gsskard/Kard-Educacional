@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarContatos, importarCarga, dispararEtapa } from '../api/n8n'
+import PillStatus from '../componentes/PillStatus'
 
-// Tela "espelho" reusada pelas 3 etapas (Educacional 1, Educacional 2, Cobrança).
+// Tela "espelho" reusada pelas etapas (Educacional, Cobrança).
 // Recebe a config da etapa e monta as 5 seções da Fase 1 (Claude2.md seção 8):
 //   1) Upload do arquivo   (RF-26)
 //   2) Conferência da carga (RF-27/28)
@@ -56,7 +57,7 @@ export default function TelaEtapa({ etapa }) {
   async function confirmarImportacao() {
     try {
       setMsg('Enviando carga para o n8n...')
-      await importarCarga(etapa.rota, carga.registros)
+      await importarCarga(etapa.valorEtapa, carga.registros)
       setMsg('Carga importada com sucesso.')
     } catch (err) {
       setMsg('⏳ ' + err.message)
@@ -137,7 +138,7 @@ export default function TelaEtapa({ etapa }) {
         <p className="ajuda">
           Esta etapa usa a inbox <code>{etapa.chaveConfigInbox}</code>.
           {etapa.formato === 'educacional'
-            ? ' (Educacional 1 e 2 compartilham o mesmo remetente.)'
+            ? ' (Educacional usa um remetente próprio.)'
             : ' (Cobrança usa remetente próprio — resp. Emerson Correia.)'}
         </p>
         <p className="pendente">
@@ -159,6 +160,7 @@ function AcompanhamentoEtapa({ etapa }) {
   const [erro, setErro] = useState('')
   const [msg, setMsg] = useState('')
   const [disparando, setDisparando] = useState(false)
+  const [modelo, setModelo] = useState((etapa.modelos && etapa.modelos[0]?.id) || '')
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -172,13 +174,15 @@ function AcompanhamentoEtapa({ etapa }) {
   }
   useEffect(() => { carregar() }, [])
 
-  const daEtapa = rows.filter((r) => (r.etapa || 'Educacional 1') === etapa.valorEtapa)
+  const daEtapa = rows.filter((r) => (r.etapa || 'Educacional') === etapa.valorEtapa)
+
+  const modeloAtual = (etapa.modelos || []).find((m) => m.id === modelo)
 
   async function disparar() {
-    if (!window.confirm(`Disparar o e-mail de "${etapa.titulo}" para ${daEtapa.length} contato(s)?`)) return
+    if (!window.confirm(`Disparar o modelo "${modeloAtual?.nome || modelo}" de ${etapa.titulo} para ${daEtapa.length} contato(s)?`)) return
     setDisparando(true); setMsg('')
     try {
-      await dispararEtapa(etapa.valorEtapa)
+      await dispararEtapa(etapa.valorEtapa, modelo)
       setMsg('Disparo enviado ao n8n. Atualize em instantes para ver o status.')
     } catch (e) {
       setMsg('⏳ Falha ao disparar: ' + e.message + ' (o workflow "Disparar por Etapa" está ativo no n8n?)')
@@ -191,10 +195,21 @@ function AcompanhamentoEtapa({ etapa }) {
     <section className="secao">
       <h2>4. Disparo e 5. Acompanhamento <small>(RF-19/24/34)</small></h2>
 
+      {etapa.modelos && etapa.modelos.length > 0 && (
+        <div className="campo-modelo">
+          <label>Modelo do e-mail</label>
+          <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
+            {etapa.modelos.map((m) => (
+              <option key={m.id} value={m.id}>{m.nome}</option>
+            ))}
+          </select>
+          {modeloAtual && <span className="ajuda">{modeloAtual.descricao}</span>}
+        </div>
+      )}
+
       <div className="acoes">
         <button
           className="btn-primario"
-          style={{ background: etapa.cor }}
           disabled={disparando || daEtapa.length === 0}
           onClick={disparar}
         >
@@ -220,8 +235,8 @@ function AcompanhamentoEtapa({ etapa }) {
                   <td>{r.nome || '—'}</td>
                   <td>{r.email || '—'}</td>
                   <td>{r.etapa || '—'}</td>
-                  <td>{r.status_envio || '—'}</td>
-                  <td>{r.inbox || <span className="pendente">a capturar</span>}</td>
+                  <td><PillStatus status={r.status_envio} /></td>
+                  <td>{r.inbox || <span className="ajuda">a capturar</span>}</td>
                 </tr>
               ))}
               {daEtapa.length === 0 && (
