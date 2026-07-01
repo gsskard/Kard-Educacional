@@ -77,12 +77,25 @@ function parseEmails(valor) {
 // RF-09/10/36/37: enriquece UMA empresa via Hunter (acha domínio → e-mails de RH
 // → dados da empresa) e grava na tabela `empresas`. Usa cache Redis no n8n.
 // `forcar=true` ignora o cache e busca de novo no Hunter (botão reenriquecer).
-export async function enriquecerEmpresa(empresa, cnpj, forcar) {
+export async function enriquecerEmpresa(empresa, cnpj, forcar, dominio) {
   return req('/crm-cobranca/enriquecer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ empresa, cnpj, forcar: forcar === true }),
+    body: JSON.stringify({ empresa, cnpj, forcar: forcar === true, dominio: dominio || undefined }),
   })
+}
+
+// Sugestões de domínio por nome (Clearbit autocomplete — grátis, sem chave).
+// Devolve [{ name, domain, logo }]. Usada pra o usuário escolher o domínio certo.
+export async function sugerirDominios(nome) {
+  try {
+    const r = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(nome)}`)
+    if (!r.ok) return []
+    const data = await r.json()
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
 }
 
 // RF-39/40: eventos de e-mail (enviado/aberto/clicado) por contato/etapa/inbox.

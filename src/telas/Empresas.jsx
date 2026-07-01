@@ -1,6 +1,42 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, sugerirDominios } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
+
+// Seletor de domínio: mostra sugestões (Clearbit) + campo manual, pra o usuário
+// escolher o domínio certo quando o nome é ambíguo (ex.: Kard, O Boticário).
+function DomainPicker({ nome, onEscolher, onFechar }) {
+  const [sug, setSug] = useState([])
+  const [manual, setManual] = useState('')
+  const [carregando, setCarregando] = useState(true)
+  useEffect(() => {
+    let ativo = true
+    sugerirDominios(nome).then((s) => { if (ativo) { setSug(s); setCarregando(false) } })
+    return () => { ativo = false }
+  }, [nome])
+  return (
+    <div className="dominio-picker">
+      <div className="ajuda">Qual o domínio correto de <b>{nome}</b>?</div>
+      {carregando ? (
+        <div className="ajuda">buscando sugestões…</div>
+      ) : sug.length > 0 ? (
+        sug.map((s) => (
+          <button key={s.domain} className="dom-opcao" onClick={() => onEscolher(s.domain)}>
+            <CompanyLogo dominio={s.domain} nome={s.name} size={20} />
+            <span className="dom-nome">{s.domain}</span>
+            <small>{s.name}</small>
+          </button>
+        ))
+      ) : (
+        <div className="ajuda">Sem sugestões — digite o domínio abaixo.</div>
+      )}
+      <div className="dom-manual">
+        <input placeholder="ex.: kard.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
+        <button className="btn-mini" disabled={!manual.trim()} onClick={() => onEscolher(manual.trim())}>usar</button>
+        <button className="btn-mini" onClick={onFechar}>fechar</button>
+      </div>
+    </div>
+  )
+}
 
 // Tela de Empresas (RF-09/10/33/37): empresas enriquecidas via Hunter —
 // logo, CNPJ, domínio/site, localização, nº de funcionários, categoria e os
@@ -22,6 +58,7 @@ export default function Empresas() {
   const [view, setView] = useState('cards')       // 'cards' | 'tabela'
   const [expandido, setExpandido] = useState(() => new Set())
   const [emLote, setEmLote] = useState(false)
+  const [pickerKey, setPickerKey] = useState(null)   // card com o seletor de domínio aberto
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -84,6 +121,19 @@ export default function Empresas() {
     }
   }
 
+  // usa o domínio escolhido pelo usuário e reenriquece por esse domínio
+  async function escolherDominio(e, dominio) {
+    setPickerKey(null)
+    try {
+      setMsg(`Reenriquecendo "${e.empresa}" pelo domínio ${dominio}...`)
+      await enriquecerEmpresa(e.empresa, e.cnpj, true, dominio)
+      setMsg('Domínio atualizado. Clique em Atualizar em instantes.')
+      carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    }
+  }
+
   return (
     <div>
       <header className="pagina-head"><h1>Empresas</h1></header>
@@ -120,7 +170,16 @@ export default function Empresas() {
                 </div>
               </div>
 
-              <div className="empresa-linha"><span className="chave">Domínio</span><span>{e.dominio || '—'}</span></div>
+              <div className="empresa-linha">
+                <span className="chave">Domínio</span>
+                <span className="dom-linha">
+                  {e.dominio || '—'}
+                  <button className="link-mini" onClick={() => setPickerKey(pickerKey === (e.cnpj || e.empresa || i) ? null : (e.cnpj || e.empresa || i))}>trocar</button>
+                </span>
+              </div>
+              {pickerKey === (e.cnpj || e.empresa || i) && (
+                <DomainPicker nome={e.empresa} onEscolher={(dom) => escolherDominio(e, dom)} onFechar={() => setPickerKey(null)} />
+              )}
               <div className="empresa-linha"><span className="chave">Site</span>{e.site ? <a href={e.site} target="_blank" rel="noreferrer">{e.site}</a> : <span>—</span>}</div>
               <div className="empresa-linha"><span className="chave">Localização</span><span>{e.localizacao || '—'}</span></div>
               <div className="empresa-linha"><span className="chave">Funcionários</span><span>{e.funcionarios || '—'}</span></div>

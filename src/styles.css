@@ -175,6 +175,17 @@ input:focus, select:focus { outline: none; border-color: var(--verde); box-shado
 .rh-info { display: flex; flex-direction: column; }
 .rh-cargo { color: var(--muted); font-size: 11px; }
 .empresa-cel { display: inline-flex; align-items: center; gap: 8px; }
+.dom-linha { display: inline-flex; align-items: center; gap: 8px; }
+.link-mini { background: none; border: none; color: var(--verde-600); font-size: 12px; font-weight: 600; padding: 0; text-decoration: underline; }
+
+/* seletor de domínio */
+.dominio-picker { background: #f7f9fc; border: 1px solid var(--borda); border-radius: 10px; padding: 10px; margin: 8px 0; }
+.dom-opcao { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 10px; margin: 4px 0; font-size: 13px; }
+.dom-opcao:hover { border-color: var(--verde); background: var(--verde-50); }
+.dom-opcao .dom-nome { font-weight: 600; color: var(--navy); }
+.dom-opcao small { color: var(--muted); margin-left: auto; }
+.dom-manual { display: flex; gap: 6px; margin-top: 8px; }
+.dom-manual input { flex: 1; padding: 7px 10px; font-size: 13px; }
 
 /* alternância de visão (Cartões / Tabela) */
 .view-toggle { display: inline-flex; border: 1px solid var(--borda-forte); border-radius: 10px; overflow: hidden; }
