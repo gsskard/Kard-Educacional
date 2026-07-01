@@ -21,9 +21,9 @@ function DomainPicker({ nome, onEscolher, onFechar }) {
       ) : sug.length > 0 ? (
         sug.map((s) => (
           <button key={s.domain} className="dom-opcao" onClick={() => onEscolher(s.domain)}>
-            <CompanyLogo dominio={s.domain} nome={s.name} size={20} />
+            <CompanyLogo dominio={s.domain} nome={s.domain} size={20} />
             <span className="dom-nome">{s.domain}</span>
-            <small>{s.name}</small>
+            <small>{s.total} e-mail(s)</small>
           </button>
         ))
       ) : (

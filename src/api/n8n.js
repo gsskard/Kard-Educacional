@@ -85,14 +85,13 @@ export async function enriquecerEmpresa(empresa, cnpj, forcar, dominio) {
   })
 }
 
-// Sugestões de domínio por nome (Clearbit autocomplete — grátis, sem chave).
-// Devolve [{ name, domain, logo }]. Usada pra o usuário escolher o domínio certo.
+// Sugestões de domínio por nome — igual ao autocomplete do Hunter.
+// O n8n gera candidatos (nome + vários TLDs) e conta e-mails de cada no Hunter
+// (grátis, não gasta crédito). Devolve [{ domain, total }] ordenado por total.
 export async function sugerirDominios(nome) {
   try {
-    const r = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(nome)}`)
-    if (!r.ok) return []
-    const data = await r.json()
-    return Array.isArray(data) ? data : []
+    const data = await req(`/crm-cobranca/dominios?empresa=${encodeURIComponent(nome)}`)
+    return Array.isArray(data) ? data : (data?.dominios || [])
   } catch {
     return []
   }
