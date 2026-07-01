@@ -29,11 +29,17 @@ flowchart LR
     API -->|move p/ Cobrança 2| CBTK
 ```
 
-As **3 etapas** do contato:
+As **3 etapas** do contato (nomes oficiais):
 
-1. **Educativo** — lembrete amigável (no/antes do vencimento).
-2. **Cobrança 1** — primeira cobrança. A passagem de Educativo → Cobrança 1 é **automática**, por data.
-3. **Cobrança 2** — cobrança mais firme. A passagem Cobrança 1 → Cobrança 2 é **manual** (uma pessoa move o card no painel), e ao mover, o email é disparado.
+1. **Educacional 1** — primeiro contato educativo.
+2. **Educacional 2** — segundo contato educativo.
+3. **Cobrança** — cobrança.
+
+> **Fluxo (atualizado 01/07/2026):** cada etapa tem sua **própria tela**, que sobe seu
+> arquivo e **dispara sozinha** (upload por etapa, independente). Não há mais régua
+> automática movendo de uma etapa para a outra. O diagrama acima descreve o fluxo
+> antigo (Educativo → Cobrança 1 automático + Cobrança 2 manual) e será refeito quando
+> os workflows de disparo por etapa forem construídos (ver `ESTRUTURA-FASE1.md`).
 
 ---
 
@@ -48,7 +54,7 @@ As **3 etapas** do contato:
 | `empresa` | texto | Empresa do contato |
 | `valor` | número | Valor em aberto (R$) |
 | `vencimento` | data | Data de vencimento — dispara a régua |
-| `etapa` | texto | Educativo / Cobranca 1 / Cobranca 2 |
+| `etapa` | texto | Educacional 1 / Educacional 2 / Cobrança |
 | `status_envio` | texto | enviado / falha (último disparo) |
 | `cbtk_id` | texto | ID retornado pela CyberTalk no disparo |
 | `ultimo_envio` | data | Quando foi o último disparo |

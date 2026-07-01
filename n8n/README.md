@@ -24,9 +24,16 @@ n8n/
 
 | Workflow | Arquivo | O que faz | Doc |
 |---|---|---|---|
-| **ETL CSV** | `workflows/ia-cobranca-etl-csv.json` | Importa contatos de um CSV para a tabela `cobranca` | [docs/etl-csv.md](docs/etl-csv.md) |
-| **Régua** | `workflows/ia-cobranca-regua.json` | Todo dia às 9h, move `Educativo → Cobrança 1` por data e dispara o email | [docs/regua.md](docs/regua.md) |
 | **API** | `workflows/ia-cobranca-api.json` | Webhooks que o painel React usa (listar contatos e mover etapa) | [docs/api.md](docs/api.md) |
+| **Importar por Etapa** | `workflows/ia-cobranca-importar-etapa.json` | Recebe `{etapa, registros}` do painel e grava na tabela `cobranca` | [docs/importar-disparar-etapa.md](docs/importar-disparar-etapa.md) |
+| **Disparar por Etapa** | `workflows/ia-cobranca-disparar-etapa.json` | Recebe `{etapa}` e dispara o e-mail daquela etapa via CyberTalk | [docs/importar-disparar-etapa.md](docs/importar-disparar-etapa.md) |
+| **ETL CSV** | `workflows/ia-cobranca-etl-csv.json` | (antigo) Importa contatos de um CSV via formulário | [docs/etl-csv.md](docs/etl-csv.md) |
+| **Régua** | `workflows/ia-cobranca-regua.json` | (antigo/inerte) Régua automática — substituída pelo disparo por etapa | [docs/regua.md](docs/regua.md) |
+
+> **Fluxo atual (01/07/2026):** etapas `Educacional 1 / Educacional 2 / Cobrança`;
+> cada tela **importa e dispara a sua** (workflows *Importar/Disparar por Etapa*).
+> O **ETL CSV** e a **Régua** são do modelo antigo — a Régua ficou inerte após o
+> rename (não acha mais `Educativo`).
 
 Como esses três se conectam (e com o front-end), está no [CLAUDE.md](../CLAUDE.md) na raiz do projeto.
 

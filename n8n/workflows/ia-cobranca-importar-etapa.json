@@ -1,0 +1,73 @@
+{
+  "name": "IA - Cobrança - Importar por Etapa",
+  "nodes": [
+    {
+      "id": "11111111-1111-4111-8111-111111111101",
+      "name": "Importar (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-cobranca/importar",
+        "responseMode": "onReceived",
+        "options": { "allowedOrigins": "*" }
+      },
+      "webhookId": "11111111-1111-4111-8111-1111111111aa"
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111102",
+      "name": "Normalizar por etapa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = ($input.first().json.body) || {};\nconst etapa = body.etapa || 'Educacional 1';\nconst registros = Array.isArray(body.registros) ? body.registros : [];\nconst reEmail = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/;\nconst out = [];\nfor (const r of registros) {\n  const email = String(r.email || r.Email || '').trim().toLowerCase();\n  if (!reEmail.test(email)) continue;\n  const nome = String(r.nome || r.Nome || r.nome_cliente || '').trim();\n  const empresa = String(r.empresa || r.Empresa || r.empregador || '').trim();\n  let vr = (r.valor != null) ? r.valor : ((r.valor_total_saldo != null) ? r.valor_total_saldo : (r.Valor || ''));\n  let valor = 0; const vraw = String(vr).trim();\n  if (vraw) { let s = vraw.replace(/[^0-9.,-]/g, ''); if (s.indexOf(',') > -1) { s = s.replace(/\\./g, '').replace(',', '.'); } valor = parseFloat(s); if (isNaN(valor)) valor = 0; }\n  const draw = String(r.vencimento || r.Vencimento || r.dt_vencimento || '').trim();\n  let venc = '';\n  if (draw) { let dt; if (draw.indexOf('/') > -1) { dt = DateTime.fromFormat(draw, 'dd/LL/yyyy'); if (!dt.isValid) dt = DateTime.fromFormat(draw, 'd/L/yyyy'); } else { dt = DateTime.fromISO(draw); } if (dt && dt.isValid) venc = dt.toISODate(); }\n  out.push({ json: { nome: nome, email: email, empresa: empresa, valor: valor, vencimento: venc, etapa: etapa } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111103",
+      "name": "Upsert por etapa",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [440, 0],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": { "__rl": true, "mode": "id", "value": "vwWbTJOAkbxCbhzw" },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            { "keyName": "email", "condition": "eq", "keyValue": "={{ $json.email }}" }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nome": "={{ $json.nome }}",
+            "email": "={{ $json.email }}",
+            "empresa": "={{ $json.empresa }}",
+            "valor": "={{ $json.valor }}",
+            "vencimento": "={{ $json.vencimento }}",
+            "etapa": "={{ $json.etapa }}"
+          },
+          "schema": [
+            { "id": "nome", "displayName": "nome", "type": "string", "required": false, "display": true, "canBeUsedToMatch": false },
+            { "id": "email", "displayName": "email", "type": "string", "required": false, "display": true, "canBeUsedToMatch": true },
+            { "id": "empresa", "displayName": "empresa", "type": "string", "required": false, "display": true, "canBeUsedToMatch": false },
+            { "id": "valor", "displayName": "valor", "type": "number", "required": false, "display": true, "canBeUsedToMatch": false },
+            { "id": "vencimento", "displayName": "vencimento", "type": "string", "required": false, "display": true, "canBeUsedToMatch": false },
+            { "id": "etapa", "displayName": "etapa", "type": "string", "required": false, "display": true, "canBeUsedToMatch": false }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Importar (POST)": { "main": [[{ "node": "Normalizar por etapa", "type": "main", "index": 0 }]] },
+    "Normalizar por etapa": { "main": [[{ "node": "Upsert por etapa", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

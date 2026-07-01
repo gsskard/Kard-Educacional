@@ -72,3 +72,65 @@ button { font-family: inherit; cursor: pointer; }
 .empty { font-size: 12px; color: var(--muted); text-align: center; padding: 12px 0; }
 .banner { background: #fff4e0; border: 1px solid #f0d6a0; color: #7a4d00; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
 .loading { color: var(--muted); padding: 20px; text-align: center; }
+
+/* ===== Layout com menu lateral (Fase 1) ===== */
+.shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.sidebar {
+  background: var(--verde-900); color: var(--verde-50);
+  display: flex; flex-direction: column; padding: 16px 12px;
+}
+.brand { padding: 8px 10px 16px; }
+.brand-nome { font-size: 18px; font-weight: 700; }
+.brand-sub { font-size: 11px; color: var(--verde-100); margin-top: 2px; }
+.menu-grupo { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--verde-100); opacity: .8; padding: 14px 10px 6px; }
+.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: transparent; border: none; color: var(--verde-50);
+  padding: 9px 10px; border-radius: 8px; font-size: 14px; margin-bottom: 2px;
+}
+.menu-item:hover { background: rgba(255,255,255,.08); }
+.menu-item.ativo { background: var(--verde-600); font-weight: 600; }
+.menu-icone { width: 18px; text-align: center; opacity: .9; }
+.sidebar-rodape { margin-top: auto; font-size: 11px; color: var(--verde-100); padding: 12px 10px 4px; }
+.conteudo { padding: 24px 28px; max-width: 1000px; }
+
+/* ===== Cabeçalho de página e seções ===== */
+.pagina-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid var(--borda); padding-bottom: 12px; margin-bottom: 20px; }
+.pagina-head h1 { font-size: 20px; margin: 0; }
+.badge { color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 999px; }
+.secao { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.secao h2 { font-size: 15px; margin: 0 0 10px; }
+.secao h2 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.secao-titulo { font-size: 15px; margin: 20px 0 12px; }
+.ajuda { font-size: 12px; color: var(--muted); margin: 4px 0; }
+.pendente { font-size: 12px; color: var(--ambar); background: #fff7ec; border: 1px dashed #f0d6a0; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.arquivo-nome { font-size: 12px; color: var(--verde-600); margin-left: 10px; }
+code { background: var(--verde-50); color: var(--verde-800); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+
+/* ===== Botões ===== */
+.btn-primario { color: #fff; background: var(--verde-600); border: none; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.btn-primario:disabled { opacity: .45; cursor: not-allowed; }
+.btn-mini { border: 1px solid var(--borda); background: transparent; color: var(--verde-600); border-radius: 6px; padding: 3px 9px; font-size: 12px; }
+.acoes { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+
+/* ===== Conferência / preview de carga ===== */
+.resumo-carga { display: flex; flex-direction: column; gap: 6px; font-size: 13px; margin-bottom: 12px; }
+.resumo-carga .alerta { color: var(--vermelho); }
+.resumo-carga .ok { color: var(--verde-600); }
+.preview-wrap { overflow-x: auto; }
+.preview { width: 100%; border-collapse: collapse; font-size: 12px; }
+.preview th, .preview td { border: 1px solid var(--borda); padding: 6px 8px; text-align: left; white-space: nowrap; }
+.preview th { background: var(--verde-50); color: var(--verde-800); font-weight: 600; }
+
+/* ===== Funil do dashboard ===== */
+.funil { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.funil-card { text-align: left; background: var(--card); border: 1px solid var(--borda); border-top: 4px solid var(--verde-400); border-radius: 12px; padding: 16px; }
+.funil-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.funil-num { font-size: 30px; font-weight: 700; }
+.funil-label { font-size: 14px; font-weight: 600; margin: 4px 0; }
+.lista-integracoes { font-size: 13px; color: var(--texto); line-height: 1.7; padding-left: 18px; }
+
+@media (max-width: 720px) {
+  .shell { grid-template-columns: 1fr; }
+  .funil, .metrics { grid-template-columns: 1fr; }
+}
