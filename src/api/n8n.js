@@ -74,13 +74,14 @@ function parseEmails(valor) {
   return []
 }
 
-// RF-09/10/36/37: enriquece UMA empresa via Snov (acha domínio → e-mails de RH
-// → valida) e grava na tabela `empresas`. Recebe nome e (se houver) cnpj.
-export async function enriquecerEmpresa(empresa, cnpj) {
+// RF-09/10/36/37: enriquece UMA empresa via Hunter (acha domínio → e-mails de RH
+// → dados da empresa) e grava na tabela `empresas`. Usa cache Redis no n8n.
+// `forcar=true` ignora o cache e busca de novo no Hunter (botão reenriquecer).
+export async function enriquecerEmpresa(empresa, cnpj, forcar) {
   return req('/crm-cobranca/enriquecer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ empresa, cnpj }),
+    body: JSON.stringify({ empresa, cnpj, forcar: forcar === true }),
   })
 }
 

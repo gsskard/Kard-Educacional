@@ -50,11 +50,12 @@ export default function Empresas() {
     })
   }
 
+  // reenriquecer força nova busca no Hunter (ignora o cache Redis)
   async function enriquecer(e) {
     try {
-      setMsg(`Enriquecendo "${e.empresa}" via Hunter...`)
-      await enriquecerEmpresa(e.empresa, e.cnpj)
-      setMsg('Enriquecimento concluído.')
+      setMsg(`Reenriquecendo "${e.empresa}" via Hunter (ignorando cache)...`)
+      await enriquecerEmpresa(e.empresa, e.cnpj, true)
+      setMsg('Enriquecimento atualizado. Clique em Atualizar em instantes.')
       carregar()
     } catch (err) {
       setMsg('⏳ ' + err.message)
