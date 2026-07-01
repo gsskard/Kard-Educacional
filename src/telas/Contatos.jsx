@@ -91,7 +91,7 @@ export default function Contatos() {
                 <td>{r.nome || '—'}</td>
                 <td>
                   <span className="empresa-cel">
-                    <CompanyLogo dominio={r.dominio} nome={r.empresa} size={24} />
+                    <CompanyLogo dominio={r.dominio} logo={r.logo} nome={r.empresa} size={24} />
                     {r.empresa || '—'}
                   </span>
                 </td>

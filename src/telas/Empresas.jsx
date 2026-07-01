@@ -72,7 +72,7 @@ export default function Empresas() {
           {visiveis.map((e, i) => (
             <div className="empresa-card" key={e.cnpj || e.empresa || i}>
               <div className="empresa-topo">
-                <CompanyLogo dominio={e.dominio} nome={e.empresa} size={48} />
+                <CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={48} />
                 <div className="empresa-id">
                   <div className="empresa-nome">{e.empresa || '—'}</div>
                   <div className="empresa-cnpj">{e.cnpj || 'CNPJ —'}</div>
