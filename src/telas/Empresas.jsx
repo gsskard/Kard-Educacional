@@ -97,7 +97,7 @@ export default function Empresas() {
       let n = 0
       for (const e of rows) {
         setMsg(`Enriquecendo ${++n}/${rows.length}: ${e.empresa}…`)
-        await enriquecerEmpresa(e.empresa, e.cnpj)
+        await enriquecerEmpresa(e.empresa, e.cnpj, false, e.dominio)
         await new Promise((r) => setTimeout(r, 800))
       }
       setMsg('Enriquecimento em lote concluído. Clique em Atualizar em instantes.')
@@ -113,7 +113,7 @@ export default function Empresas() {
   async function enriquecer(e) {
     try {
       setMsg(`Reenriquecendo "${e.empresa}" via Hunter (ignorando cache)...`)
-      await enriquecerEmpresa(e.empresa, e.cnpj, true)
+      await enriquecerEmpresa(e.empresa, e.cnpj, true, e.dominio)
       setMsg('Enriquecimento atualizado. Clique em Atualizar em instantes.')
       carregar()
     } catch (err) {
