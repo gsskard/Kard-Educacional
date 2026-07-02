@@ -276,6 +276,16 @@ Aceita também uma URL `logo` manual (prop `logo`) com prioridade.
 - **Limpar dados de teste** (empresas/contatos fake: Nubank, Stone, Gerdau, O Boticário, ACME, etc.).
 - Formato do arquivo **Educacional** (Anexo B) ainda não definido.
 
+### Gostaríamos (backlog — não fazer agora)
+- **E-mails de RH sem depender do Hunter pago.** O domínio + 1 e-mail corporativo real já saem
+  de graça do CNPJ (Receita/BrasilAPI). Ideias para achar e-mails de RH sem custo:
+  1. **Padrões de RH + verificação** — gerar `rh@`, `dp@`, `recursoshumanos@`, `gente@`,
+     `pessoas@` + o e-mail oficial da Receita, e validar entrega (MX/SMTP) no n8n. Grátis, ilimitado
+     (SMTP às vezes é bloqueado → não é 100%).
+  2. **Snov.io / Apollo.io free tier** (~50–100/mês) para e-mails nominais.
+  3. **Misto:** grátis por padrão + Hunter (~50/mês) só nas empresas prioritárias.
+- Cache (Redis) também no `/dominios` para economizar `email-count` do Hunter.
+
 ---
 
 ## 11. Documentos relacionados
