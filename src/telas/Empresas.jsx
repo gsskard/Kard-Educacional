@@ -232,6 +232,16 @@ function ValidacaoLote({ onEnriquecido }) {
                   )}
                 </div>
 
+                {r.ctx && (r.ctx.categoria || r.ctx.localizacao || r.ctx.razao_social) && (
+                  <div className="lote-ctx">
+                    {r.ctx.nome_fantasia && r.ctx.nome_fantasia.toLowerCase() !== (r.empresa || '').toLowerCase() && (
+                      <span className="ctx-item">🏢 {r.ctx.nome_fantasia}</span>
+                    )}
+                    {r.ctx.categoria && <span className="ctx-item">{r.ctx.categoria}</span>}
+                    {r.ctx.localizacao && <span className="ctx-item">📍 {r.ctx.localizacao}</span>}
+                  </div>
+                )}
+
                 {r.erro ? (
                   <div className="ajuda">⏳ {r.erro}</div>
                 ) : (r.candidatos && r.candidatos.length > 0) ? (
@@ -255,7 +265,8 @@ function ValidacaoLote({ onEnriquecido }) {
                             <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
                             <span className="dom-nome">{c.domain}</span>
                             <small>{c.total} e-mail(s)</small>
-                            {eMelhor && <span className="chip-tag">★</span>}
+                            {c.oficial && <span className="chip-tag oficial" title="domínio do e-mail oficial na Receita">Receita</span>}
+                            {eMelhor && !c.oficial && <span className="chip-tag">★</span>}
                           </button>
                         )
                       })}

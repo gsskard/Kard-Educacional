@@ -199,13 +199,23 @@ ver os domínios candidatos + logo + o **palpite da IA** de qual é o corporativ
 **sem consumir busca do Hunter** (só o `email-count`, que é grátis, e o Groq).
 ```
 POST validar {empresa, cnpj}
-  → Candidatos (lote)   slug do nome + ~22 TLDs
+  → Consultar CNPJ       BrasilAPI (grátis, sem chave): razão social, nome fantasia, CNAE, município/UF
+  → Consultar Receita    ReceitaWS (grátis, limite 3/min): e-mail oficial → domínio real
+  → Candidatos (lote)    slugs de fantasia+nome+razão (concat/1ª/2 primeiras palavras) × TLDs BR
+                         + o domínio do e-mail oficial da Receita
   → Contar emails (lote) email-count por candidato (batch 5, grátis)
-  → Agregar (lote)      mantém total>0, ordena desc → {empresa, cnpj, candidatos[]}
-  → Analisar IA         HTTP POST Groq (llama-3.3-70b, JSON mode) rankeia candidatos
-  → Montar validacao    parseia o JSON da IA e junta com os candidatos
-  → Responder validar   responde SÍNCRONO (o front espera o resultado)
+  → Agregar (lote)       mantém total>0, garante o domínio oficial (flag `oficial`, mesmo com 0),
+                         ordena desc, anexa `ctx` (razão, fantasia, categoria, localização)
+  → Analisar IA          HTTP POST Groq (llama-3.3-70b, JSON mode); prioriza o domínio oficial da Receita
+  → Montar validacao     parseia o JSON da IA + junta candidatos e `ctx`
+  → Responder validar    responde SÍNCRONO (o front espera o resultado)
 ```
+> **Por que o CNPJ importa:** nomes de várias palavras não viram domínio (ASSAI ATACADISTA →
+> `assaiatacadista` não existe; o real é `assai.com.br`). O CNPJ traz razão/fantasia (slugs
+> melhores) e, via ReceitaWS, o **e-mail oficial** — que dá o domínio real mesmo quando a marca
+> difere da operadora (Outback → `bloominbrands.com.br`). APIs de CNPJ usadas: **BrasilAPI**
+> (rápida, sem limite, sem e-mail) e **ReceitaWS** (traz e-mail, mas 3 req/min no plano free →
+> em lote grande só as primeiras pegam o e-mail; as demais caem nos slugs). Tudo **grátis**.
 - **Grátis:** logo (URL pública), contagem de e-mails (`email-count`) e a IA (Groq free).
 - **Só gasta Hunter** quando o analista clica num domínio candidato → chama
   `enriquecerEmpresa(empresa, cnpj, forçar=true, dominio)` (o fluxo do §6.1), que aí busca

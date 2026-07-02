@@ -287,6 +287,11 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .cand-chip small { color: var(--muted); margin-left: auto; }
 .cand-chip.melhor { border-color: var(--verde); background: var(--verde-50); }
 .chip-tag { color: var(--verde-600); font-weight: 700; margin-left: 6px; }
+.chip-tag.oficial { background: var(--verde); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: .3px; }
+
+.lote-ctx { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: -4px 0 12px; font-size: 12px; color: var(--muted); }
+.lote-ctx .ctx-item { display: inline-flex; align-items: center; gap: 4px; }
+.lote-ctx .ctx-item + .ctx-item::before { content: "·"; margin-right: 8px; color: var(--borda-forte); }
 
 /* ===================================================================
    Responsividade
