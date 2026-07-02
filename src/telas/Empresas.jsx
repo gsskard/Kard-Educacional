@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, sugerirDominios, validarDominio } from '../api/n8n'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 
 // Seletor de domínio: mostra sugestões (Clearbit) + campo manual, pra o usuário
@@ -101,49 +101,77 @@ function ProbBar({ valor }) {
 }
 
 function ValidacaoLote({ onEnriquecido }) {
-  const [entrada, setEntrada] = useState([])       // [{empresa, cnpj}]
+  const [entrada, setEntrada] = useState([])       // [{empresa, cnpj}] lido do CSV/texto
   const [arquivo, setArquivo] = useState('')
   const [texto, setTexto] = useState('')
-  const [resultados, setResultados] = useState([]) // [{empresa,cnpj,candidatos,ia}]
-  const [rodando, setRodando] = useState(false)
-  const [progresso, setProgresso] = useState('')
+  const [resultados, setResultados] = useState([]) // linhas da tabela validacoes (candidatos já parseado)
+  const [lote, setLote] = useState(null)           // { loteId, total }
   const [msg, setMsg] = useState('')
+  const timerRef = useRef(null)
+
+  // Retoma o último lote ao abrir a aba — permite fechar a tela e voltar depois.
+  useEffect(() => {
+    let salvo = null
+    try { salvo = JSON.parse(localStorage.getItem('kard_lote') || 'null') } catch { salvo = null }
+    if (salvo && salvo.loteId) { setLote(salvo); acompanhar(salvo.loteId, salvo.total) }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function carregarArquivo(ev) {
     const f = ev.target.files && ev.target.files[0]
     if (!f) return
     setArquivo(f.name)
     const leitor = new FileReader()
-    leitor.onload = () => { setEntrada(parseCSV(String(leitor.result || ''))); setResultados([]) }
+    leitor.onload = () => { setEntrada(parseCSV(String(leitor.result || ''))) }
     leitor.readAsText(f)
   }
 
   function carregarTexto() {
-    setEntrada(parseCSV(texto)); setResultados([]); setArquivo('')
+    setEntrada(parseCSV(texto)); setArquivo('')
   }
 
+  // Lê os resultados salvos do lote e reagenda enquanto faltar empresa.
+  async function acompanhar(loteId, total) {
+    try {
+      const rows = await lerValidacoes(loteId)
+      setResultados(rows)
+      if (!total || rows.length < total) {
+        timerRef.current = setTimeout(() => acompanhar(loteId, total), 12000)
+      } else {
+        setMsg(`Lote concluído: ${rows.length}/${total} empresas. ✅`)
+      }
+    } catch (err) {
+      timerRef.current = setTimeout(() => acompanhar(loteId, total), 15000)
+    }
+  }
+
+  // Inicia o lote no servidor. Ele processa 1 empresa a cada ~20s (respeita a ReceitaWS 3/min);
+  // a tela pode ser fechada — os resultados ficam salvos e reaparecem ao voltar.
   async function validar() {
     if (!entrada.length) return
-    setRodando(true); setMsg(''); setResultados([])
-    const acc = []
+    const loteId = 'L' + Date.now() + '-' + Math.floor(Math.random() * 1000)
+    setResultados([]); setMsg('')
     try {
-      let n = 0
-      for (const e of entrada) {
-        setProgresso(`Analisando ${++n}/${entrada.length}: ${e.empresa}…`)
-        try {
-          const r = await validarDominio(e.empresa, e.cnpj)
-          acc.push(r || { empresa: e.empresa, cnpj: e.cnpj, candidatos: [], ia: {} })
-        } catch (err) {
-          acc.push({ empresa: e.empresa, cnpj: e.cnpj, candidatos: [], ia: {}, erro: err.message })
-        }
-        setResultados([...acc])
-        await new Promise((r) => setTimeout(r, 400))
-      }
-      setProgresso('')
-      setMsg(`Concluído: ${acc.length} empresa(s) analisada(s).`)
-    } finally {
-      setRodando(false)
+      const r = await iniciarValidacaoLote(loteId, entrada)
+      const total = (r && r.total) || entrada.length
+      const eta = (r && r.eta_segundos) || total * 20
+      const info = { loteId, total }
+      setLote(info)
+      localStorage.setItem('kard_lote', JSON.stringify(info))
+      const min = Math.max(1, Math.round(eta / 60))
+      setMsg(`Processando ${total} empresa(s) no servidor (~${min} min, cerca de 3/min pela Receita). Você pode fechar esta tela e voltar mais tarde — os resultados vão aparecendo aqui.`)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      acompanhar(loteId, total)
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
     }
+  }
+
+  function novoLote() {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    localStorage.removeItem('kard_lote')
+    setLote(null); setResultados([]); setMsg(''); setEntrada([]); setTexto(''); setArquivo('')
   }
 
   // Enriquece de fato o domínio escolhido (gasta cota do Hunter) e joga na aba Empresas.
@@ -163,8 +191,8 @@ function ValidacaoLote({ onEnriquecido }) {
     for (const r of resultados) {
       const cands = (r.candidatos || []).map((c) => `${c.domain}(${c.total})`).join(' | ')
       linhas.push([
-        r.empresa || '', r.cnpj || '', r.ia?.melhor_dominio || '',
-        String(r.ia?.probabilidade ?? ''), (r.ia?.justificativa || '').replace(/"/g, "'"), cands,
+        r.empresa || '', r.cnpj || '', r.melhor_dominio || '',
+        String(r.probabilidade ?? ''), String(r.justificativa || '').replace(/"/g, "'"), cands,
       ])
     }
     const csv = linhas.map((l) => l.map((c) => `"${String(c)}"`).join(';')).join('\n')
@@ -174,48 +202,58 @@ function ValidacaoLote({ onEnriquecido }) {
     URL.revokeObjectURL(url)
   }
 
+  const feitas = resultados.length
+  const total = (lote && lote.total) || 0
+
   return (
     <div>
       <p className="ajuda">
         Suba um CSV com <b>CNPJ</b> e <b>nome da empresa</b> (colunas <code>empresa</code> e <code>cnpj</code>).
-        Para cada uma, trazemos os domínios candidatos com a contagem de e-mails, a logo e o
-        palpite da IA (qual é o domínio corporativo mais provável). Isso <b>não gasta</b> cota do Hunter —
-        só quando você clicar em <b>enriquecer</b> o domínio escolhido.
+        O servidor processa <b>~3 empresas por minuto</b> (limite da Receita) e vai salvando os resultados —
+        então <b>pode fechar a tela e voltar depois</b>. Não gasta cota do Hunter; só ao clicar em <b>enriquecer</b> um domínio.
       </p>
 
       {msg && <div className="banner">{msg}</div>}
 
-      <div className="lote-entrada">
-        <label className="btn-secundario arquivo-label">
-          Escolher CSV
-          <input type="file" accept=".csv,text/csv" onChange={carregarArquivo} hidden />
-        </label>
-        {arquivo && <span className="arquivo-nome">{arquivo}</span>}
-        <span className="ajuda">ou cole abaixo (uma empresa por linha):</span>
-      </div>
-      <textarea
-        className="lote-textarea"
-        placeholder={'empresa;cnpj\nMagazine Luiza;47.960.950/0001-21\nO Boticário;'}
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        rows={4}
-      />
-      <div className="toolbar">
-        <button className="btn-refresh" onClick={carregarTexto} disabled={!texto.trim()}>Ler texto colado</button>
-        <button className="btn-primario" onClick={validar} disabled={rodando || !entrada.length}>
-          {rodando ? 'Analisando…' : `Validar ${entrada.length || ''} empresa(s)`}
-        </button>
-        {resultados.length > 0 && !rodando && (
-          <button className="btn-refresh" onClick={baixarCSV}>Baixar resultado (CSV)</button>
-        )}
-      </div>
+      {!lote ? (
+        <>
+          <div className="lote-entrada">
+            <label className="btn-secundario arquivo-label">
+              Escolher CSV
+              <input type="file" accept=".csv,text/csv" onChange={carregarArquivo} hidden />
+            </label>
+            {arquivo && <span className="arquivo-nome">{arquivo}</span>}
+            <span className="ajuda">ou cole abaixo (uma empresa por linha):</span>
+          </div>
+          <textarea
+            className="lote-textarea"
+            placeholder={'empresa;cnpj\nMagazine Luiza;47.960.950/0001-21\nO Boticário;'}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            rows={4}
+          />
+          <div className="toolbar">
+            <button className="btn-refresh" onClick={carregarTexto} disabled={!texto.trim()}>Ler texto colado</button>
+            <button className="btn-primario" onClick={validar} disabled={!entrada.length}>
+              {`Validar ${entrada.length || ''} empresa(s)`}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="toolbar">
+          <span className="ajuda">Lote em andamento: <b>{feitas}/{total}</b> concluídas.</span>
+          {feitas > 0 && <button className="btn-refresh" onClick={baixarCSV}>Baixar resultado (CSV)</button>}
+          <button className="btn-refresh" onClick={novoLote}>Novo lote</button>
+        </div>
+      )}
 
-      {progresso && <div className="loading">{progresso}</div>}
+      {lote && feitas < total && <div className="loading">Aguardando o servidor processar… ({feitas}/{total})</div>}
 
-      {resultados.length > 0 && (
+      {feitas > 0 && (
         <div className="lote-resultados">
           {resultados.map((r, i) => {
-            const melhor = r.ia?.melhor_dominio || (r.candidatos && r.candidatos[0]?.domain) || ''
+            const cands = r.candidatos || []
+            const melhor = r.melhor_dominio || (cands[0] && cands[0].domain) || ''
             return (
               <div className="lote-card" key={(r.cnpj || '') + r.empresa + i}>
                 <div className="lote-topo">
@@ -224,36 +262,32 @@ function ValidacaoLote({ onEnriquecido }) {
                     <div className="empresa-nome">{r.empresa}</div>
                     <div className="empresa-cnpj">{r.cnpj || 'CNPJ —'}</div>
                   </div>
-                  {r.ia?.probabilidade > 0 && (
+                  {Number(r.probabilidade) > 0 && (
                     <div className="lote-ia-resumo">
                       <small>palpite da IA</small>
-                      <ProbBar valor={r.ia.probabilidade} />
+                      <ProbBar valor={r.probabilidade} />
                     </div>
                   )}
                 </div>
 
-                {r.ctx && (r.ctx.categoria || r.ctx.localizacao || r.ctx.razao_social) && (
+                {(r.categoria || r.localizacao) && (
                   <div className="lote-ctx">
-                    {r.ctx.nome_fantasia && r.ctx.nome_fantasia.toLowerCase() !== (r.empresa || '').toLowerCase() && (
-                      <span className="ctx-item">🏢 {r.ctx.nome_fantasia}</span>
-                    )}
-                    {r.ctx.categoria && <span className="ctx-item">{r.ctx.categoria}</span>}
-                    {r.ctx.localizacao && <span className="ctx-item">📍 {r.ctx.localizacao}</span>}
+                    {r.categoria && <span className="ctx-item">{r.categoria}</span>}
+                    {r.localizacao && <span className="ctx-item">📍 {r.localizacao}</span>}
                   </div>
                 )}
 
-                {r.erro ? (
-                  <div className="ajuda">⏳ {r.erro}</div>
-                ) : (r.candidatos && r.candidatos.length > 0) ? (
+                {r.melhor_dominio && (
+                  <div className="ia-box">
+                    <span className="pill pill-ok">IA: {r.melhor_dominio}</span>
+                    {r.justificativa && <span className="ia-just">{r.justificativa}</span>}
+                  </div>
+                )}
+
+                {cands.length > 0 ? (
                   <>
-                    {r.ia?.melhor_dominio && (
-                      <div className="ia-box">
-                        <span className="pill pill-ok">IA: {r.ia.melhor_dominio}</span>
-                        {r.ia.justificativa && <span className="ia-just">{r.ia.justificativa}</span>}
-                      </div>
-                    )}
                     <div className="cand-chips">
-                      {r.candidatos.map((c) => {
+                      {cands.map((c) => {
                         const eMelhor = c.domain === melhor
                         return (
                           <button
@@ -274,7 +308,7 @@ function ValidacaoLote({ onEnriquecido }) {
                     <div className="ajuda">Clique num domínio para enriquecê-lo e trazer os dados/e-mails de RH para a aba Empresas.</div>
                   </>
                 ) : (
-                  <div className="ajuda">Nenhum domínio candidato encontrado para este nome.</div>
+                  <div className="ajuda">Ainda sem domínio candidato para este nome.</div>
                 )}
               </div>
             )

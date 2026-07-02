@@ -21,6 +21,8 @@ export const enriquecerEmpresa = (empresa, cnpj, forcar, dominio) =>
   empresasService.enriquecerEmpresa(empresa, cnpj, forcar, dominio)
 export const sugerirDominios = (nome) => empresasService.sugerirDominios(nome)
 export const validarDominio = (empresa, cnpj) => empresasService.validarDominio(empresa, cnpj)
+export const iniciarValidacaoLote = (loteId, registros) => empresasService.iniciarLote(loteId, registros)
+export const lerValidacoes = (loteId) => empresasService.lerLote(loteId)
 
 // RF-39/40: eventos de e-mail — endpoint ainda não existe no n8n.
 export function listarEventos() {

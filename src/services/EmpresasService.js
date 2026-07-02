@@ -36,9 +36,24 @@ export class EmpresasService {
     }
   }
 
-  // POST /crm-cobranca/validar — GRÁTIS. Validação em lote: CNPJ + candidatos + palpite da IA.
+  // POST /crm-cobranca/validar — GRÁTIS. Validação de UMA empresa: CNPJ + candidatos + palpite da IA.
   validarDominio(empresa, cnpj) {
     return this.api.post('/crm-cobranca/validar', { empresa, cnpj: cnpj || '' })
+  }
+
+  // POST /crm-cobranca/validar-lote — inicia o lote no servidor (assíncrono).
+  // Responde na hora com { lote_id, total, eta_segundos }; o n8n processa 1 empresa a cada
+  // ~20s (respeita o limite de 3/min da ReceitaWS) e salva cada resultado na tabela `validacoes`.
+  iniciarLote(loteId, registros) {
+    return this.api.post('/crm-cobranca/validar-lote', { lote_id: loteId, registros })
+  }
+
+  // GET /crm-cobranca/validacoes?lote=X — lê os resultados já salvos de um lote.
+  // `candidatos` vem como texto JSON → convertemos em lista.
+  async lerLote(loteId) {
+    const data = await this.api.get('/crm-cobranca/validacoes', { lote: loteId })
+    const lista = Array.isArray(data) ? data : (data?.data || [])
+    return lista.map((r) => ({ ...r, candidatos: Empresa.parseEmails(r.candidatos) }))
   }
 }
 
