@@ -1,95 +1,63 @@
-# Kard CRM / Backoffice — Front-end
+# Kard Backoffice — Front-end (React + Vite)
 
-Painel web (React + Vite) no visual do Portal Super Crédito da Kard, para a régua educativa/de
-cobrança e o enriquecimento de empresas. Os dados vêm dos **webhooks do n8n**.
+Painel do Backoffice da Kard (régua educativa/de cobrança + enriquecimento de empresas), no
+visual do **Portal Super Crédito**. **Todo o back-end fica no n8n** — o front só chama webhooks;
+nenhum segredo ou regra de negócio mora aqui.
 
-> **Backend** (n8n, notebooks de teste, docs do sistema e `ARQUITETURA.md`) fica no repositório
-> **`Kard-Educacional-Backend`**. A **fonte da verdade** do sistema é o `ARQUITETURA.md` **de lá**.
-> Este repositório é **só o front-end**.
->
-> **Arquitetura do front (OOP):** `services/` (ApiClient + CobrancaService/EmpresasService)
-> e `models/` (Contato/Empresa). As telas importam da fachada `src/api/n8n.js`.
+> 🔗 **Backend** (n8n, notebooks de teste, docs do sistema): repositório **`Kard-Educacional-Backend`**.
+> A **fonte da verdade** do sistema é o `ARQUITETURA.md` **de lá** — leia primeiro ao retomar.
 
-- Etapas: **Educativo → Cobrança 1 → Cobrança 2**
-- `Educativo → Cobrança 1` acontece **automaticamente** pela régua agendada no n8n (por data de vencimento)
-- `Cobrança 1 → Cobrança 2` é **manual** — feito aqui no painel (botão âmbar)
-
-## Pré-requisitos
-
-- Node.js 18+ instalado
-- Os workflows do n8n criados e **ativos**:
-  - `IA - Cobrança - API` (webhooks de leitura/escrita) — **precisa estar ativo**
-  - `IA - Cobrança - ETL CSV` (importação)
-  - `IA - Cobrança - Régua` (disparo agendado)
-
-## Configuração
-
-1. Copie o arquivo de ambiente e ajuste a URL base dos webhooks:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   No `.env`:
-
-   ```
-   VITE_N8N_BASE=https://SEU-N8N/webhook
-   ```
-
-   - Em produção use `/webhook/` (workflow ativo).
-   - Para testar com o workflow aberto no editor do n8n, use `/webhook-test/` e clique em "Listen for test event".
-
-2. Instale e rode em desenvolvimento:
-
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-   Abra o endereço que o Vite mostrar (ex.: http://localhost:5173).
-
-## Build de produção
+## Rodar
 
 ```bash
-npm run build      # gera a pasta dist/
-npm run preview    # serve o build localmente para conferir
+npm install
+npm run dev        # abre em http://localhost:5173
 ```
 
-## Subir no Git
+Copie `.env.example` → `.env` e ajuste `VITE_N8N_BASE` (a URL `/webhook` do n8n).
+Deploy: **Vercel** (cada push na `main` gera deploy).
 
-```bash
-git init
-git add .
-git commit -m "Kard CRM cobrança - front-end inicial"
-git branch -M main
-git remote add origin git@github.com:SUA-ORG/kard-crm-cobranca.git
-git push -u origin main
+## Arquitetura do front (OOP em camadas)
+
+```
+Telas (src/telas)  →  Fachada (src/api/n8n.js)  →  Serviços (src/services)  →  ApiClient  →  webhooks n8n
+                                                          usam ↓
+                                                     Modelos (src/models)
 ```
 
-## Deploy
+- **`services/ApiClient.js`** — única classe que faz `fetch` (base URL, JSON, tratamento de erro).
+- **`services/CobrancaService.js`** — contatos: `listarContatos / moverContato / importarCarga / dispararEtapa`.
+- **`services/EmpresasService.js`** — empresas: `listarEmpresas / enriquecerEmpresa / sugerirDominios / validarDominio`.
+- **`models/Contato.js`, `models/Empresa.js`** — modelos de domínio (ex.: parse de `emails_rh`).
+- **`api/n8n.js`** — **fachada fina**; as telas importam daqui (permite refatorar os serviços sem mexer nas telas).
 
-### Vercel
-1. Importe o repositório no Vercel.
-2. Framework: **Vite**. Build command: `npm run build`. Output: `dist`.
-3. Em *Settings → Environment Variables*, adicione `VITE_N8N_BASE` com a URL `/webhook` do seu n8n.
-4. Deploy.
+## Mapa do `src/`
 
-### Netlify
-1. *Add new site → Import from Git*.
-2. Build command: `npm run build`. Publish directory: `dist`.
-3. Em *Site settings → Environment variables*, adicione `VITE_N8N_BASE`.
-4. Deploy.
+```
+src/
+├─ main.jsx                 ponto de entrada
+├─ App.jsx                  roteia por hash na URL (#/dashboard, #/empresas, ...)
+├─ styles.css               tema do Portal + responsividade + animações
+├─ hooks/useHashRoute.js    mini-navegação (React puro, SEM react-router)
+├─ config/etapas.js         etapas (Educacional/Cobrança), modelos de e-mail, colunas dos arquivos
+├─ api/n8n.js               FACHADA das chamadas ao n8n
+├─ services/                ApiClient · CobrancaService · EmpresasService
+├─ models/                  Contato · Empresa
+├─ componentes/             Layout (sidebar) · CompanyLogo · PillStatus
+└─ telas/                   Dashboard · TelaEtapa · Contatos · Empresas · Configuracoes
+```
 
-## Como o front conversa com o n8n
+## Telas
 
-- `GET  {VITE_N8N_BASE}/crm-cobranca/list` → retorna todas as linhas da Data Table.
-- `POST {VITE_N8N_BASE}/crm-cobranca/update` com `{ "id": <id>, "etapa": "Cobranca 2" }` → move o contato.
+- **Dashboard** — funil por etapa.
+- **Educacional / Cobrança** — a **mesma** `TelaEtapa.jsx` (upload CSV → conferência → disparo);
+  o que muda é a config vinda de `config/etapas.js`. Educacional tem seletor de modelo de e-mail.
+- **Contatos** — base de contatos cruzada com as empresas (logo + status de enriquecimento).
+- **Empresas** — empresas enriquecidas (Hunter) + aba **Validação de domínio em lote** (CNPJ + IA).
+- **Configurações** — inboxes por etapa e integrações (esqueleto).
 
-O CORS já está liberado (`*`) no workflow da API. Para restringir, troque o `Access-Control-Allow-Origin`
-no nó "Responder" e o `allowedOrigins` dos webhooks pela URL do seu site.
+## Convenções
 
-## Próximos passos sugeridos
-
-- Disparar a Cobrança 2 automaticamente quando o card é movido para a etapa 3 (hoje o move só muda a etapa).
-- Validar/enriquecer email com Snov.io antes do disparo.
-- Adicionar autenticação no painel e nos webhooks (header auth) antes de expor publicamente.
+- Front **leve**: navegação por hash, **sem dependências novas** sem necessidade.
+- **Nada de segredo** no front. Rotas, serviços externos (Hunter, BrasilAPI, ReceitaWS, Groq) e
+  o que é grátis/pago estão documentados no repo **backend** (`notebooks/` + `ARQUITETURA.md`).
