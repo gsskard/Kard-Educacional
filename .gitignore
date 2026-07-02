@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-ssr
+vite.config.js.timestamp-*
 .env
 .env.local
 *.local
