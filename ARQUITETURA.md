@@ -115,9 +115,33 @@ sem pedir. Roda com `npm install` + `npm run dev`.
 | **IA - Cobrança - Empresas (API + Enriquecimento Hunter)** | `L9Ww11UKb9jPEkOg` | GET `/crm-cobranca/empresas`, POST `/crm-cobranca/enriquecer`, GET `/crm-cobranca/dominios`, POST `/crm-cobranca/validar` |
 | **IA - Cobrança - ETL CSV** / **Régua** | (antigos) | modelo antigo; Régua ficou **inerte** após o rename das etapas |
 
-> Os JSONs versionados em `n8n/workflows/` são de referência (com a chave da CyberTalk
+> Os JSONs versionados no repo backend (`workflows/`) são de referência (com a chave da CyberTalk
 > **redigida** para `__CBTK_KEY__`). Os workflows **ativos** de Importar/Disparar/Empresas
 > foram criados/editados **via MCP** direto no n8n (podem divergir do JSON do repo).
+
+### 4.4 Microserviços (sub-workflows reutilizáveis) — Fase 3
+O workflow de Empresas foi refatorado para **orquestrar serviços** (nós *Execute Workflow*).
+Cada serviço é um sub-workflow isolado, testável e **dono da sua dependência/chave externa**:
+
+| Serviço | ID | Encapsula | Custo | Entrada → Saída |
+|---|---|---|---|---|
+| `svc-cnpj` | `GvePDJKZJAFYms6C` | BrasilAPI + ReceitaWS | grátis | `{cnpj}` → `{razao_social, nome_fantasia, categoria, localizacao, dominio_oficial}` |
+| `svc-emailcount` | `Pr1lxYiEdoQtwPsq` | Hunter `email-count` | grátis | itens `{domain}` → `{domain, total}` |
+| `svc-ia-rank` | `dYtmYIJu6ydAtCcU` | Groq (IA) | grátis | `{empresa,cnpj,ctx,candidatos}` → `{melhor_dominio, probabilidade, justificativa, ranking}` |
+| `svc-hunter-enrich` | `Y5ewcwYznqOfHKh1` | Hunter `domain-search` + `companies-find` | **paga** | `{empresa, dominio}` → `{emails_rh, site, localizacao, funcionarios, categoria}` |
+
+Orquestração das rotas (workflow `L9Ww11UKb9jPEkOg`):
+- `POST /validar` → svc-cnpj → *Candidatos* → **svc-emailcount** → *Agregar* → **svc-ia-rank** → *Montar*.
+- `GET /dominios` → *Gerar candidatos* → **svc-emailcount** (reuso) → *Agregar*.
+- `POST /enriquecer` → cache Redis → **svc-hunter-enrich** → *Ler atual* → *Montar (merge)* → cache set → salvar.
+
+> **Chaves centralizadas:** Hunter fica só em `svc-emailcount` e `svc-hunter-enrich`; Groq só em
+> `svc-ia-rank`. O workflow de rota não tem mais segredo (por isso sumiram os avisos de
+> `HARDCODED_CREDENTIALS` nele). Sub-workflows usam *Execute Workflow Trigger* com
+> `inputSource: passthrough`; o chamador usa *Execute Workflow* (`workflowInputs` em `defineBelow`
+> com `value: {}` para não quebrar o resource-mapper). Todos precisam estar **publicados**.
+> Rotas de cobrança (list/update/importar/disparar) ainda não foram "microservicificadas"
+> (são só banco, sem dependência externa — menor necessidade).
 
 ---
 
