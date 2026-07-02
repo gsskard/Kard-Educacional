@@ -77,6 +77,11 @@ sem pedir. Roda com `npm install` + `npm run dev`.
 | `listarEmpresas()` | GET `/crm-cobranca/empresas` | parseia `emails_rh` (JSON) em lista |
 | `enriquecerEmpresa(empresa, cnpj, forcar, dominio)` | POST `/crm-cobranca/enriquecer` | ver §6 |
 | `sugerirDominios(nome)` | GET `/crm-cobranca/dominios` | lista de domínios candidatos (ver §6.3) |
+| `validarDominio(empresa, cnpj)` | POST `/crm-cobranca/validar` | validação em lote com palpite da IA (ver §6.5) |
+
+> A tela **Empresas** tem 2 abas: **"Empresas enriquecidas"** (cartões/tabela) e
+> **"Validação de domínio em lote"** (sobe CSV com empresa/cnpj → candidatos + logo +
+> contagem + palpite da IA; ver §6.5). Ambas no `telas/Empresas.jsx`.
 
 ---
 
@@ -94,6 +99,8 @@ sem pedir. Roda com `npm install` + `npm run dev`.
 - **Redis** "kard" — id `c8GPPrteicNNQgy2` (cache do enriquecimento).
 - **CyberTalk** "CyberTalk" — `httpHeaderAuth`, id `qcyHpU9YSHKBiE6U` (ainda **não plugada** no Disparar; hoje o header usa placeholder `__CBTK_KEY__`).
 - **Hunter** — a chave da API está **hardcoded nos nós HTTP** do n8n (lado servidor, fora do repo/front). O n8n avisa `HARDCODED_CREDENTIALS`; migrar para uma Credential `httpQueryAuth` é uma melhoria pendente.
+- **OpenAI** "kard" — `openAiApi`, id `R5os8lzzzHQJwTU6` (existe no projeto; **não usada** no fim — trocamos por Groq por ser gratuito).
+- **Groq** (IA da validação em lote) — usa a API compatível com OpenAI (`https://api.groq.com/openai/v1/chat/completions`, modelo `llama-3.3-70b-versatile`). A chave (prefixo `gsk_`) está **hardcoded no header `Authorization` do nó "Analisar IA"** (lado servidor). Foi colada no chat → **rotacionar** e migrar para Credential `httpHeaderAuth`/`httpBearerAuth`.
 
 ### 4.3 Workflows (todos no projeto acima)
 | Workflow | ID | Endpoints / função |
@@ -101,7 +108,7 @@ sem pedir. Roda com `npm install` + `npm run dev`.
 | **IA - Cobrança - API** | (pré-existente) | GET `/crm-cobranca/list`, POST `/crm-cobranca/update` |
 | **IA - Cobrança - Importar por Etapa** | `ez9lEpuoR9JVAzDK` | POST `/crm-cobranca/importar` → normaliza e upsert na cobranca |
 | **IA - Cobrança - Disparar por Etapa** | `jRCmvffiFz7ZyM7W` | POST `/crm-cobranca/disparar` {etapa, modelo} → CyberTalk (⚠️ preencher chave) |
-| **IA - Cobrança - Empresas (API + Enriquecimento Hunter)** | `L9Ww11UKb9jPEkOg` | GET `/crm-cobranca/empresas`, POST `/crm-cobranca/enriquecer`, GET `/crm-cobranca/dominios` |
+| **IA - Cobrança - Empresas (API + Enriquecimento Hunter)** | `L9Ww11UKb9jPEkOg` | GET `/crm-cobranca/empresas`, POST `/crm-cobranca/enriquecer`, GET `/crm-cobranca/dominios`, POST `/crm-cobranca/validar` |
 | **IA - Cobrança - ETL CSV** / **Régua** | (antigos) | modelo antigo; Régua ficou **inerte** após o rename das etapas |
 
 > Os JSONs versionados em `n8n/workflows/` são de referência (com a chave da CyberTalk
@@ -122,6 +129,7 @@ Base produção: `https://n8n.srv1759869.hstgr.cloud/webhook`
 | GET | `/crm-cobranca/empresas` | — | empresas enriquecidas |
 | POST | `/crm-cobranca/enriquecer` | `{empresa, cnpj, forcar, dominio}` | (onReceived) |
 | GET | `/crm-cobranca/dominios?empresa=X` | — | `[{domain, total}]` |
+| POST | `/crm-cobranca/validar` | `{empresa, cnpj}` | `{empresa, cnpj, candidatos[], ia{melhor_dominio, probabilidade, justificativa, ranking[]}}` (síncrono) |
 
 Todos com CORS `*`. Os POST de importar/disparar/enriquecer usam `responseMode: onReceived`
 (respondem 200 na hora e processam depois → evita resposta pendurada).
@@ -185,6 +193,29 @@ sistema reenriquece por ele.
 Validade do e-mail = confiança do Hunter: ≥80 `valido`, ≥50 `desconhecido`, abaixo `invalido`.
 Plano da conta é **Free** (~50 buscas/mês) → por isso o cache importa.
 
+### 6.5 Validação de domínio em lote (`POST /crm-cobranca/validar`) — decidir sem gastar cota
+Fluxo pensado para o analista subir uma lista (CSV) de empresas/CNPJs e, para cada uma,
+ver os domínios candidatos + logo + o **palpite da IA** de qual é o corporativo correto —
+**sem consumir busca do Hunter** (só o `email-count`, que é grátis, e o Groq).
+```
+POST validar {empresa, cnpj}
+  → Candidatos (lote)   slug do nome + ~22 TLDs
+  → Contar emails (lote) email-count por candidato (batch 5, grátis)
+  → Agregar (lote)      mantém total>0, ordena desc → {empresa, cnpj, candidatos[]}
+  → Analisar IA         HTTP POST Groq (llama-3.3-70b, JSON mode) rankeia candidatos
+  → Montar validacao    parseia o JSON da IA e junta com os candidatos
+  → Responder validar   responde SÍNCRONO (o front espera o resultado)
+```
+- **Grátis:** logo (URL pública), contagem de e-mails (`email-count`) e a IA (Groq free).
+- **Só gasta Hunter** quando o analista clica num domínio candidato → chama
+  `enriquecerEmpresa(empresa, cnpj, forçar=true, dominio)` (o fluxo do §6.1), que aí busca
+  funcionários/localização/e-mails de RH e salva na tabela `empresas`.
+- No front: aba **"Validação de domínio em lote"** em `telas/Empresas.jsx` (parser de CSV
+  próprio, sem dep nova; loop por empresa com barra de progresso; export do resultado em CSV).
+- A IA recebe **contexto do negócio** (empresa brasileira empregadora; objetivo é falar com o
+  RH sobre crédito consignado) → prefere `.com.br`/`.com` institucional e descarta TLD de
+  outro país. Retorna `probabilidade` (0-100) e `justificativa` curta.
+
 ---
 
 ## 7. Logos das empresas (`CompanyLogo`)
@@ -226,6 +257,7 @@ Aceita também uma URL `logo` manual (prop `logo`) com prioridade.
   `cobranca`, o Importar gravar, e fluir para `empresas` no enriquecimento. (Hunter não traz CNPJ.)
 - **Disparar por Etapa:** plugar a Credential CyberTalk (ou preencher a chave) para o envio funcionar.
 - **Migrar a chave do Hunter** para uma Credential `httpQueryAuth` (tirar do nó).
+- **Rotacionar a chave do Groq** (foi compartilhada no chat) e migrar do header do nó "Analisar IA" para uma Credential `httpHeaderAuth`/`httpBearerAuth`.
 - **TTL no cache Redis** (renovar sozinho a cada X dias), se desejado.
 - **Limpar dados de teste** (empresas/contatos fake: Nubank, Stone, Gerdau, O Boticário, ACME, etc.).
 - Formato do arquivo **Educacional** (Anexo B) ainda não definido.

@@ -85,6 +85,18 @@ export async function enriquecerEmpresa(empresa, cnpj, forcar, dominio) {
   })
 }
 
+// Validação de domínio em lote (uma empresa por chamada). Para o nome/CNPJ dados,
+// o n8n gera os domínios candidatos (com a contagem de e-mails do Hunter — grátis)
+// e pede ao Groq (IA) que aponte qual é o domínio corporativo mais provável.
+// Retorna { empresa, cnpj, candidatos:[{domain,total}], ia:{melhor_dominio,probabilidade,justificativa,ranking} }.
+export async function validarDominio(empresa, cnpj) {
+  return req('/crm-cobranca/validar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ empresa, cnpj: cnpj || '' }),
+  })
+}
+
 // Sugestões de domínio por nome — igual ao autocomplete do Hunter.
 // O n8n gera candidatos (nome + vários TLDs) e conta e-mails de cada no Hunter
 // (grátis, não gasta crédito). Devolve [{ domain, total }] ordenado por total.
