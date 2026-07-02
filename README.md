@@ -3,8 +3,9 @@
 Painel web (React + Vite) no visual do Portal Super Crédito da Kard, para a régua educativa/de
 cobrança e o enriquecimento de empresas. Os dados vêm dos **webhooks do n8n**.
 
-> **Backend** (n8n, notebooks de teste e docs) fica no repositório **`kard-backend`**.
-> A fonte da verdade do sistema é o `ARQUITETURA.md` (neste repo).
+> **Backend** (n8n, notebooks de teste, docs do sistema e `ARQUITETURA.md`) fica no repositório
+> **`Kard-Educacional-Backend`**. A **fonte da verdade** do sistema é o `ARQUITETURA.md` **de lá**.
+> Este repositório é **só o front-end**.
 >
 > **Arquitetura do front (OOP):** `services/` (ApiClient + CobrancaService/EmpresasService)
 > e `models/` (Contato/Empresa). As telas importam da fachada `src/api/n8n.js`.
