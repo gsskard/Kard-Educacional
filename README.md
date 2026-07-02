@@ -1,7 +1,13 @@
-# Kard CRM — Régua de cobrança (front-end)
+# Kard CRM / Backoffice — Front-end
 
-Painel web (React + Vite) estilo HubSpot, em tons de verde da Kard, para acompanhar a régua
-educativa e de cobrança. Os dados vêm da **Data Table `cobranca` do n8n**, via webhooks.
+Painel web (React + Vite) no visual do Portal Super Crédito da Kard, para a régua educativa/de
+cobrança e o enriquecimento de empresas. Os dados vêm dos **webhooks do n8n**.
+
+> **Backend** (n8n, notebooks de teste e docs) fica no repositório **`kard-backend`**.
+> A fonte da verdade do sistema é o `ARQUITETURA.md` (neste repo).
+>
+> **Arquitetura do front (OOP):** `services/` (ApiClient + CobrancaService/EmpresasService)
+> e `models/` (Contato/Empresa). As telas importam da fachada `src/api/n8n.js`.
 
 - Etapas: **Educativo → Cobrança 1 → Cobrança 2**
 - `Educativo → Cobrança 1` acontece **automaticamente** pela régua agendada no n8n (por data de vencimento)

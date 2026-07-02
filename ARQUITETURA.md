@@ -56,7 +56,11 @@ sem pedir. Roda com `npm install` + `npm run dev`.
 | `App.jsx` | Roteia por hash (`#/dashboard`, `#/educacional`, `#/cobranca`, `#/contatos`, `#/empresas`, `#/configuracoes`) |
 | `hooks/useHashRoute.js` | Mini-roteador por hash |
 | `config/etapas.js` | Config das etapas (Educacional/Cobrança), modelos de e-mail, colunas esperadas dos arquivos |
-| `api/n8n.js` | **Todas** as chamadas aos webhooks do n8n (única camada de rede) |
+| `services/ApiClient.js` | Cliente HTTP base (OOP): base URL, JSON, erros (única classe que faz `fetch`) |
+| `services/CobrancaService.js` | Regras das rotas de cobrança/contatos (usa `Contato`) |
+| `services/EmpresasService.js` | Regras de empresas: enriquecer/sugerir/validar domínio (usa `Empresa`) |
+| `models/Contato.js`, `models/Empresa.js` | Modelos de domínio (`fromJson`, parse de `emails_rh`) |
+| `api/n8n.js` | **Fachada fina** que reexporta os serviços (as telas importam daqui; não quebra nada) |
 | `componentes/Layout.jsx` | Sidebar (logo Kard + "Backoffice") + topo com usuário e breadcrumb |
 | `componentes/CompanyLogo.jsx` | Logo da empresa por domínio (fontes em cascata, ver §7) |
 | `componentes/PillStatus.jsx` | Selo colorido de status de envio |
@@ -275,7 +279,9 @@ Aceita também uma URL `logo` manual (prop `logo`) com prioridade.
 ---
 
 ## 11. Documentos relacionados
+- **Repo `kard-backend`** — backend separado: **notebooks Jupyter** que testam cada rota
+  (grátis/pago, sites/lógica, como o front chama), `docs/` por workflow e JSONs de referência.
+  (A pasta `n8n/` saiu deste repo do front e foi para lá.)
 - `ESTRUTURA-FASE1.md` — detalhe do esqueleto do front (Fase 1 / MVP).
 - `CLAUDE.md` — visão do CRM (n8n + front), modelo de dados.
 - `Claude2.md` — documento de requisitos original (RF-xx).
-- `n8n/docs/` — docs por workflow (importar/disparar, empresas-enriquecimento).
