@@ -8,17 +8,19 @@ export class EmpresasService {
     this.api = cliente
   }
 
-  // GET /crm-cobranca/empresas — empresas enriquecidas (emails_rh já parseado no modelo).
+  // GET /crm-cobranca/rh-empresas — empresas enriquecidas (agregado por CNPJ da
+  // tabela rh_enriquecimento do módulo Snov). emails_rh traz só os já revelados.
   async listarEmpresas() {
-    const data = await this.api.get('/crm-cobranca/empresas')
+    const data = await this.api.get('/crm-cobranca/rh-empresas')
     const lista = Array.isArray(data) ? data : (data?.data || [])
     return lista.map(Empresa.fromJson)
   }
 
-  // POST /crm-cobranca/enriquecer — PAGA (cota Hunter). forcar=true ignora o cache Redis;
-  // dominio manda a busca por domínio (evita chute errado).
+  // POST /crm-cobranca/rh-preview — GRÁTIS (0 créditos Snov). Descobre o domínio
+  // (BrasilAPI/Receita + contagem Snov) e salva os prospects sem e-mail.
+  // forcar=true ignora o cache; dominio manda a busca por domínio (evita chute errado).
   enriquecerEmpresa(empresa, cnpj, forcar, dominio) {
-    return this.api.post('/crm-cobranca/enriquecer', {
+    return this.api.post('/crm-cobranca/rh-preview', {
       empresa,
       cnpj,
       forcar: forcar === true,
