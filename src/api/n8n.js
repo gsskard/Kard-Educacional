@@ -8,6 +8,7 @@
 import { api } from '../services/ApiClient'
 import { cobrancaService } from '../services/CobrancaService'
 import { empresasService } from '../services/EmpresasService'
+import { rhService } from '../services/RhService'
 
 // --- Cobrança / contatos ---
 export const listarContatos = () => cobrancaService.listarContatos()
@@ -23,6 +24,11 @@ export const sugerirDominios = (nome) => empresasService.sugerirDominios(nome)
 export const validarDominio = (empresa, cnpj) => empresasService.validarDominio(empresa, cnpj)
 export const iniciarValidacaoLote = (loteId, registros) => empresasService.iniciarLote(loteId, registros)
 export const lerValidacoes = (loteId) => empresasService.lerLote(loteId)
+
+// --- Enriquecimento de RH (Snov.io) — 3 rotas: preview (grátis), revelar/validar (pago) ---
+export const rhPreview = (empresa, cnpj, dominio, cargosAlvo) => rhService.preview(empresa, cnpj, dominio, cargosAlvo)
+export const rhRevelar = (cnpj, hashes, modo, n) => rhService.revelar(cnpj, hashes, modo, n)
+export const rhValidar = (hashes) => rhService.validar(hashes)
 
 // RF-39/40: eventos de e-mail — endpoint ainda não existe no n8n.
 export function listarEventos() {

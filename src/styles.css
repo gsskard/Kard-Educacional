@@ -294,6 +294,93 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .lote-ctx .ctx-item + .ctx-item::before { content: "·"; margin-right: 8px; color: var(--borda-forte); }
 
 /* ===================================================================
+   Enriquecimento de RH (Snov)
+   =================================================================== */
+/* barra de ações em lote + medidor de crédito */
+.rh-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.rh-inline { display: inline-flex; align-items: center; gap: 6px; }
+.rh-n { width: 60px; border: 1px solid var(--borda-forte); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.rh-filtro { border: 1px solid var(--borda-forte); border-radius: 10px; padding: 9px 14px; font-size: 13px; min-width: 220px; margin-left: auto; }
+.rh-filtro:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px var(--verde-50); }
+
+.rh-meter {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  border: 1px solid var(--borda); border-radius: 14px;
+  padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+}
+.rh-meter-nums { color: var(--muted); }
+.rh-meter-nums b { color: var(--verde-600); font-size: 15px; }
+.rh-meter-custo { color: var(--muted); }
+.rh-meter-custo.ativo { color: #92600a; background: #fff8ec; border: 1px solid #f4d79a; border-radius: 999px; padding: 4px 14px; font-weight: 700; }
+.rh-meter .btn-primario, .rh-meter .btn-refresh { padding: 8px 14px; font-size: 13px; }
+.rh-meter .btn-primario { margin-left: auto; }
+.rh-meter .btn-primario + .btn-refresh { margin-left: 0; }
+
+.dom-select { border: 1px solid var(--borda-forte); border-radius: 8px; padding: 5px 8px; font-size: 12px; background: var(--card); color: var(--navy-800); max-width: 200px; }
+
+/* planilha de RH (1 linha por contato, agrupada por empresa) */
+.rh-wrap { border: 1px solid var(--borda); border-radius: 14px; overflow: auto; background: var(--card); box-shadow: 0 1px 3px rgba(30,43,77,.05); }
+.planilha-rh { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+.planilha-rh thead th {
+  position: sticky; top: 0; z-index: 2; background: #f7f9fc; color: var(--muted);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--borda); white-space: nowrap;
+}
+.planilha-rh tbody td { padding: 12px 16px; border-bottom: 1px solid var(--borda); color: var(--navy-800); vertical-align: middle; white-space: normal; }
+.planilha-rh tbody tr:last-child td { border-bottom: none; }
+.planilha-rh .col-check { width: 42px; text-align: center; }
+.planilha-rh input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--verde); cursor: pointer; }
+.planilha-rh .grupo-inicio:not(:first-child) td { border-top: 2px solid #eaeff6; }
+.planilha-rh .pl-contato:hover td { background: var(--verde-50); }
+.planilha-rh .continuacao .cel-empresa .empresa-cel { visibility: hidden; }
+.planilha-rh .pl-vazia td { background: #fafbfd; color: var(--muted); }
+.cel-empresa { min-width: 190px; }
+.cel-empresa .empresa-cel { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--navy); }
+.cel-dom { font-size: 11px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+.pl-nome { color: var(--navy-800); }
+.pl-linkedin {
+  display: inline-flex; align-items: center; justify-content: center; margin-left: 8px;
+  width: 18px; height: 18px; border-radius: 4px; background: #0a66c2; color: #fff;
+  font-size: 10px; font-weight: 800; text-decoration: none; text-transform: lowercase;
+}
+.cel-email { min-width: 190px; }
+.rh-email-val { color: var(--navy-800); word-break: break-all; }
+.btn-liberar {
+  border: 1px solid var(--borda-forte); background: transparent; color: var(--verde-600);
+  border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.btn-liberar:hover { background: var(--verde-50); border-color: var(--verde); }
+.btn-liberar:disabled { opacity: .5; }
+
+/* celular: cada contato vira um cartão (sem scroll horizontal) */
+@media (max-width: 720px) {
+  .rh-barra > .btn-primario { flex: 1 1 100%; }
+  .rh-filtro { margin-left: 0; width: 100%; min-width: 0; order: -1; }
+  .rh-meter { flex-direction: column; align-items: stretch; }
+  .rh-meter .btn-primario, .rh-meter .btn-refresh { margin-left: 0; width: 100%; }
+
+  .rh-wrap { border: none; border-radius: 0; overflow: visible; background: transparent; box-shadow: none; }
+  .planilha-rh thead { display: none; }
+  .planilha-rh, .planilha-rh tbody, .planilha-rh tr { display: block; }
+  .planilha-rh tbody tr { position: relative; padding: 12px 14px; margin-bottom: 12px;
+    border: 1px solid var(--borda); border-radius: 14px; background: var(--card); box-shadow: 0 1px 3px rgba(30,43,77,.06); }
+  .planilha-rh tbody td { display: flex; justify-content: space-between; align-items: center; gap: 14px;
+    padding: 6px 0; border: none; white-space: normal; }
+  .planilha-rh tbody td:not(:last-child) { border-bottom: 1px dashed var(--borda); }
+  .planilha-rh tbody td::before { content: attr(data-label); font-size: 11px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .3px; flex: 0 0 auto; }
+  .planilha-rh td.cel-empresa { flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--borda); }
+  .planilha-rh .continuacao .cel-empresa .empresa-cel { visibility: visible; }
+  .cel-empresa .empresa-cel { font-size: 15px; }
+  .planilha-rh td.col-check { position: absolute; top: 12px; right: 12px; padding: 0; border: none; }
+  .planilha-rh td.col-check::before { content: ''; }
+  .planilha-rh td.cel-email { word-break: break-all; }
+  .planilha-rh .grupo-inicio:not(:first-child) td { border-top: none; }
+  .planilha-rh .grupo-inicio td.cel-empresa { border-top: none; }
+}
+
+/* ===================================================================
    Responsividade
    =================================================================== */
 /* telas médias: métricas em 2 colunas */
