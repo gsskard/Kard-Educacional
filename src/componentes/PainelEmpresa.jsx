@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import CompanyLogo from './CompanyLogo'
 import { enriquecerEmpresa, sugerirDominios, rhRevelar } from '../api/n8n'
+import { nomeProprio, formatarCnpj } from '../lib/formato'
 
 // Painel lateral ÚNICO (gaveta estilo HubSpot) com o "perfil" da empresa.
 // É autossuficiente: chama os serviços por dentro (desbloquear e-mail, trocar
@@ -44,7 +45,7 @@ function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
   return (
     <div className="dominio-picker">
       <div className="ajuda">
-        Domínios de <b>{empresa.empresa}</b> — o número é de e-mails públicos (grátis).
+        Domínios de <b>{nomeProprio(empresa.empresa)}</b> — o número é de e-mails públicos (grátis).
         <b> Enriquecer</b> busca os contatos de RH na Snov e <b>gasta crédito</b>.
       </div>
       {live === null ? (
@@ -127,8 +128,8 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
         <header className="painel-topo">
           <CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={44} />
           <div className="painel-titulo">
-            <strong>{e.empresa || '—'}</strong>
-            {e.cnpj && <small>{e.cnpj}</small>}
+            <strong>{nomeProprio(e.empresa) || '—'}</strong>
+            {e.cnpj && <small>{formatarCnpj(e.cnpj)}</small>}
           </div>
           <button className="painel-fechar" onClick={aoFechar} aria-label="Fechar">✕</button>
         </header>
@@ -173,7 +174,7 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
                   <div className={'rh-linha' + (c.eh_rh ? ' rh-alvo' : '')} key={c.id ?? i}>
                     <span className="rh-info">
                       <span className="rh-nome">
-                        {c.nome || '—'}
+                        {nomeProprio(c.nome) || '—'}
                         {c.eh_rh && <span className="tag-rh-mini">RH</span>}
                       </span>
                       <small className="rh-cargo">{c.cargo || '—'}</small>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
+import { nomeProprio, formatarCnpj } from '../lib/formato'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
@@ -685,7 +686,7 @@ export default function Empresas() {
     }
     const linhas = []
     for (const e of visiveis) {
-      const base = [e.empresa, e.cnpj, e.localizacao, e.porte, e.capital_social, e.categoria, e.dominio]
+      const base = [nomeProprio(e.empresa), formatarCnpj(e.cnpj), e.localizacao, e.porte, e.capital_social, e.categoria, e.dominio]
       // exporta os dados salvos no banco (todos os contatos); respeita o toggle
       // "Mostrar sem e-mail" (senão, só os que já têm e-mail liberado).
       const todos = e.rh_contatos || []
@@ -694,7 +695,7 @@ export default function Empresas() {
         linhas.push([...base, '', '', '', '', e.enriquecido_em])
       } else {
         for (const c of contatos) {
-          linhas.push([...base, c.nome, c.cargo, c.email || '', validadeTxt(c.valido), e.enriquecido_em])
+          linhas.push([...base, nomeProprio(c.nome), c.cargo, c.email || '', validadeTxt(c.valido), e.enriquecido_em])
         }
       }
     }
@@ -836,8 +837,8 @@ export default function Empresas() {
             <tbody>
               {visiveis.map((e, i) => (
                 <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => setEmpresaAberta(chaveEmp(e))} title="Ver empresa">
-                  <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{e.empresa || '—'}</span></td>
-                  <td>{e.cnpj || '—'}</td>
+                  <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{nomeProprio(e.empresa) || '—'}</span></td>
+                  <td>{formatarCnpj(e.cnpj) || '—'}</td>
                   <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}</td>
                   <td>{e.localizacao || '—'}</td>
                   <td>{e.porte || '—'}</td>
@@ -876,8 +877,8 @@ export default function Empresas() {
                 const cnpj = e.cnpj || '—'
                 const cabec = () => (
                   <>
-                    <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={22} />{e.empresa || '—'}</span></td>
-                    <td>{cnpj}</td>
+                    <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={22} />{nomeProprio(e.empresa) || '—'}</span></td>
+                    <td>{formatarCnpj(cnpj)}</td>
                     <td>{e.localizacao || '—'}</td>
                     <td>{e.porte || '—'}</td>
                     <td>{e.dominio || '—'}</td>
@@ -901,7 +902,7 @@ export default function Empresas() {
                     {j === 0
                       ? cabec()
                       : <><td className="col-emp"></td><td></td><td></td><td></td><td></td></>}
-                    <td>{c.nome || '—'}{c.eh_rh && <span className="tag-rh-mini">RH</span>}</td>
+                    <td>{nomeProprio(c.nome) || '—'}{c.eh_rh && <span className="tag-rh-mini">RH</span>}</td>
                     <td>{c.cargo || '—'}</td>
                     <td className="cel-email">
                       {c.email

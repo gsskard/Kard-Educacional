@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarContatos, listarEmpresas, enriquecerEmpresa, importarContatos } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
+import { nomeProprio, formatarCnpj } from '../lib/formato'
 
 // Lê uma planilha CSV de contatos e devolve [{nome,cargo,empresa,cnpj,dominio,email}].
 // Aceita cabeçalho (em qualquer ordem) ou, sem cabeçalho, tenta adivinhar as colunas.
@@ -137,7 +138,7 @@ export default function Contatos() {
     }
     const simNao = (v) => (v === true || String(v).toLowerCase() === 'true' ? 'Sim' : 'Não')
     const linhas = visiveis.map((r) => [
-      r.nome, r.cargo, r.empresa, r.cnpj, r.dominio, r.email, r.email_status, simNao(r.validado),
+      nomeProprio(r.nome), r.cargo, nomeProprio(r.empresa), formatarCnpj(r.cnpj), r.dominio, r.email, r.email_status, simNao(r.validado),
     ])
     const csv = [cols, ...linhas].map((l) => l.map(esc).join(';')).join('\r\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -221,14 +222,14 @@ export default function Contatos() {
                   <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
                   <td>
                     <div className="contato-nome">
-                      <strong>{r.nome || '—'}</strong>
+                      <strong>{nomeProprio(r.nome) || '—'}</strong>
                       {r.cargo && <small className="contato-cargo">{r.cargo}</small>}
                     </div>
                   </td>
-                  <td className="col-cen" title={r.empresa || ''}>
+                  <td className="col-cen" title={nomeProprio(r.empresa)}>
                     <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={28} />
                   </td>
-                  <td>{r.cnpj || '—'}</td>
+                  <td>{formatarCnpj(r.cnpj) || '—'}</td>
                   <td>{r.dominio || '—'}</td>
                   <td>{r.email || '—'}</td>
                   <td>
