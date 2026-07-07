@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 
@@ -556,7 +556,6 @@ export default function Empresas() {
   const [msg, setMsg] = useState('')
   const [aba, setAba] = useState('empresas')       // 'empresas' | 'lote'
   const [view, setView] = useState('cards')         // 'cards' | 'tabela'
-  const [expandido, setExpandido] = useState(() => new Set())
   const [emLote, setEmLote] = useState(false)
   const [pickerKey, setPickerKey] = useState(null)  // card com o seletor de domínio aberto
 
@@ -579,14 +578,6 @@ export default function Empresas() {
       [e.empresa, e.cnpj, e.dominio, e.localizacao].some((c) => String(c || '').toLowerCase().includes(q))
     )
   }, [rows, busca])
-
-  function toggleLinha(k) {
-    setExpandido((prev) => {
-      const s = new Set(prev)
-      s.has(k) ? s.delete(k) : s.add(k)
-      return s
-    })
-  }
 
   // Enriquece TODAS as empresas. Sem forçar: as que já estão no cache Redis
   // não gastam crédito; as que faltam (ex.: sem localização) vão ao Hunter.
@@ -722,58 +713,57 @@ export default function Empresas() {
         </div>
       ) : (
         <div className="preview-wrap">
-          <table className="preview">
+          <table className="grade">
             <thead>
               <tr>
-                <th></th><th>Empresa</th><th>CNPJ</th><th>Localização</th>
-                <th>Porte</th><th>Categoria</th><th>Domínio</th>
-                <th>E-mails RH</th><th>Enriquecido</th>
+                <th className="col-emp">Empresa</th>
+                <th>CNPJ</th>
+                <th>Localização</th>
+                <th>Porte</th>
+                <th>Domínio</th>
+                <th>Nome</th>
+                <th>Cargo</th>
+                <th>E-mail</th>
+                <th className="col-cen">Validade</th>
               </tr>
             </thead>
             <tbody>
-              {visiveis.map((e, i) => {
-                const k = e.cnpj || e.empresa || String(i)
-                const aberto = expandido.has(k)
+              {visiveis.flatMap((e, i) => {
                 const emails = e.emails_rh || []
-                return (
-                  <Fragment key={k}>
-                    <tr className="linha-empresa" onClick={() => toggleLinha(k)}>
-                      <td>{emails.length > 0 ? (aberto ? '▾' : '▸') : ''}</td>
-                      <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{e.empresa || '—'}</span></td>
-                      <td>{e.cnpj || '—'}</td>
-                      <td>{e.localizacao || '—'}</td>
-                      <td>{e.porte || '—'}</td>
-                      <td>{e.categoria || '—'}</td>
-                      <td>{e.dominio || '—'}</td>
-                      <td>{emails.length}</td>
-                      <td>{e.enriquecido_em || '—'}</td>
-                    </tr>
-                    {aberto && emails.length > 0 && (
-                      <tr className="linha-detalhe">
-                        <td></td>
-                        <td colSpan={8}>
-                          <table className="sub">
-                            <thead><tr><th>E-mail</th><th>Cargo</th><th>Departamento</th><th>Validade</th></tr></thead>
-                            <tbody>
-                              {emails.map((em, j) => (
-                                <tr key={j}>
-                                  <td>{em.email || '—'}</td>
-                                  <td>{em.cargo || '—'}</td>
-                                  <td>{em.departamento || '—'}</td>
-                                  <td><PillEmail valido={em.valido} /></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                const cnpj = e.cnpj || '—'
+                const cabec = (contadorClasse) => (
+                  <>
+                    <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={22} />{e.empresa || '—'}</span></td>
+                    <td>{cnpj}</td>
+                    <td>{e.localizacao || '—'}</td>
+                    <td>{e.porte || '—'}</td>
+                    <td>{e.dominio || '—'}</td>
+                  </>
                 )
+                if (emails.length === 0) {
+                  return [(
+                    <tr key={cnpj + '-vazia'} className="grupo-inicio">
+                      {cabec()}
+                      <td colSpan={3} className="cel-vazia">nenhum RH liberado ainda</td>
+                      <td className="col-cen">—</td>
+                    </tr>
+                  )]
+                }
+                return emails.map((em, j) => (
+                  <tr key={cnpj + '-' + j} className={j === 0 ? 'grupo-inicio' : 'grupo-cont'}>
+                    {j === 0
+                      ? cabec()
+                      : <><td className="col-emp"></td><td></td><td></td><td></td><td></td></>}
+                    <td>{em.nome || '—'}</td>
+                    <td>{em.cargo || '—'}</td>
+                    <td className="cel-email">{em.email || '—'}</td>
+                    <td className="col-cen"><PillEmail valido={em.valido} /></td>
+                  </tr>
+                ))
               })}
             </tbody>
           </table>
-          <small className="ajuda">Clique numa linha para ver os cargos encontrados.</small>
+          <small className="ajuda">Uma linha por contato de RH liberado. Use os cartões para liberar novos e-mails.</small>
         </div>
       )}
       </>
