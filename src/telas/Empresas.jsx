@@ -644,6 +644,9 @@ export default function Empresas() {
   const [pickerKey, setPickerKey] = useState(null)  // card com o seletor de domínio aberto
   const [revelando, setRevelando] = useState(new Set()) // ids de RH sendo desbloqueados
   const [mostrarSemEmail, setMostrarSemEmail] = useState(false) // na Tabela: exibir contatos sem e-mail liberado
+  const [empresaAberta, setEmpresaAberta] = useState(null)      // chave da empresa com o painel lateral aberto
+
+  const chaveEmp = (e) => e.cnpj || e.empresa || ''
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -816,100 +819,34 @@ export default function Empresas() {
       ) : visiveis.length === 0 ? (
         <div className="secao"><div className="empty">Nenhuma empresa enriquecida ainda.</div></div>
       ) : view === 'cards' ? (
-        <div className="empresas-grid">
-          {visiveis.map((e, i) => (
-            <div className="empresa-card" key={e.cnpj || e.empresa || i}>
-              <div className="empresa-topo">
-                <CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={48} />
-                <div className="empresa-id">
-                  <div className="empresa-nome">{e.empresa || '—'}</div>
-                  <div className="empresa-cnpj">{e.cnpj || 'CNPJ —'}</div>
-                </div>
-              </div>
-
-              <div className="empresa-linha">
-                <span className="chave">Domínio</span>
-                <span className="dom-linha">
-                  {e.dominio || '—'}
-                  {e.dominio_count != null && <small className="dom-count">· {e.dominio_count} e-mail(s)</small>}
-                  <button className="link-mini" onClick={() => setPickerKey(pickerKey === (e.cnpj || e.empresa || i) ? null : (e.cnpj || e.empresa || i))}>trocar</button>
-                </span>
-              </div>
-              {pickerKey === (e.cnpj || e.empresa || i) && (
-                <TrocaDominio
-                  empresa={e}
-                  onEnriquecer={(dom) => {
-                    if (window.confirm(`Enriquecer "${e.empresa}" pelo domínio ${dom}?\nIsso busca os contatos de RH na Snov e gasta crédito.`)) escolherDominio(e, dom)
-                  }}
-                  onFechar={() => setPickerKey(null)}
-                />
-              )}
-              <div className="empresa-linha"><span className="chave">Site</span>{e.site ? <a href={e.site} target="_blank" rel="noreferrer">{e.site}</a> : <span>—</span>}</div>
-              <div className="empresa-linha"><span className="chave">Localização</span><span>{e.localizacao || '—'}</span></div>
-              <div className="empresa-linha"><span className="chave">Porte</span><span>{e.porte || '—'}</span></div>
-              <div className="empresa-linha"><span className="chave">Capital social</span><span>{e.capital_social || '—'}</span></div>
-              <div className="empresa-linha"><span className="chave">Categoria</span><span>{e.categoria || '—'}</span></div>
-
-              <div className="empresa-rh">
-                <div className="chave">
-                  Contatos encontrados: {e.total_prospects ?? 0}
-                  {(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} de RH</span>}
-                </div>
-                <div className="cargos-alvo">
-                  {CARGOS_ALVO.map((c) => <span className="hashtag" key={c}>#{c.replace(/\s+/g, '')}</span>)}
-                </div>
-                {(e.rh_contatos && e.rh_contatos.length > 0) ? (
-                  <div className="rh-lista">
-                    {e.rh_contatos.map((c) => (
-                      <div className={'rh-linha' + (c.eh_rh ? ' rh-alvo' : '')} key={c.id}>
-                        <span className="rh-info">
-                          <span className="rh-nome">
-                            {c.nome || '—'}
-                            {c.eh_rh && <span className="tag-rh-mini">RH</span>}
-                          </span>
-                          <small className="rh-cargo">{c.cargo || '—'}</small>
-                        </span>
-                        {c.email ? (
-                          <span className="rh-email-ok">
-                            <a href={`mailto:${c.email}`}>{c.email}</a>
-                            <PillEmail valido={c.valido} />
-                          </span>
-                        ) : (
-                          <button
-                            className="btn-olho"
-                            title="Desbloquear e-mail (1 crédito Snov)"
-                            disabled={revelando.has(c.id)}
-                            onClick={() => desbloquear(e, c)}
-                          >
-                            {revelando.has(c.id) ? (
-                              '…'
-                            ) : (
-                              <>
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-                                </svg>
-                                desbloquear
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (e.total_prospects ?? 0) > 0 ? (
-                  <span className="ajuda">Contatos encontrados, mas nenhum classificado como RH neste domínio. Use “trocar” pra revisar o domínio.</span>
-                ) : (
-                  <span className="ajuda">Nenhum contato encontrado para este domínio.</span>
-                )}
-              </div>
-
-              <div className="acoes">
-                <button className="btn-mini" onClick={() => enriquecer(e)}>reenriquecer</button>
-                {e.enriquecido_em && <span className="ajuda">enriquecido em {e.enriquecido_em}</span>}
-              </div>
-            </div>
-          ))}
+        <div className="preview-wrap tabela-full">
+          <table className="grade">
+            <thead>
+              <tr>
+                <th className="col-emp">Empresa</th>
+                <th>CNPJ</th>
+                <th>Domínio</th>
+                <th>Localização</th>
+                <th>Porte</th>
+                <th className="col-cen">Contatos</th>
+                <th>Enriquecido em</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiveis.map((e, i) => (
+                <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => { setEmpresaAberta(chaveEmp(e)); setPickerKey(null) }} title="Ver empresa">
+                  <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{e.empresa || '—'}</span></td>
+                  <td>{e.cnpj || '—'}</td>
+                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}</td>
+                  <td>{e.localizacao || '—'}</td>
+                  <td>{e.porte || '—'}</td>
+                  <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
+                  <td>{e.enriquecido_em || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <small className="ajuda">Clique numa empresa pra abrir o painel com domínio, contatos e ações (desbloquear e-mail, trocar domínio, reenriquecer).</small>
         </div>
       ) : (
         <div className="preview-wrap tabela-full">
