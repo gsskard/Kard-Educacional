@@ -27,8 +27,13 @@ export default function Layout({ rota, children }) {
   const atual = MENU.find((m) => m.rota === rota)
   const tituloAtual = atual ? atual.label : 'Kard'
 
-  // sidebar recolhida? guarda a preferência no navegador
-  const [recolhido, setRecolhido] = useState(() => localStorage.getItem('kard_menu_recolhido') === '1')
+  // gaveta recolhida? guarda a preferência; em tela estreita começa fechada (auto)
+  const [recolhido, setRecolhido] = useState(() => {
+    const s = localStorage.getItem('kard_menu_recolhido')
+    if (s === '1') return true
+    if (s === '0') return false
+    return window.innerWidth <= 820
+  })
   function alternarMenu() {
     setRecolhido((v) => {
       const novo = !v
@@ -36,9 +41,15 @@ export default function Layout({ rota, children }) {
       return novo
     })
   }
+  // navegar: em tela estreita a gaveta fecha sozinha pra não tapar o conteúdo
+  function navegar(rota) {
+    irPara(rota)
+    if (window.innerWidth <= 820) setRecolhido(true)
+  }
 
   return (
     <div className={'shell' + (recolhido ? ' recolhido' : '')}>
+      {!recolhido && <div className="sidebar-backdrop" onClick={alternarMenu} />}
       <aside className="sidebar">
         <div className="brand">
           <Logo />
@@ -49,7 +60,7 @@ export default function Layout({ rota, children }) {
             <button
               key={item.rota}
               className={'menu-item' + (rota === item.rota ? ' ativo' : '')}
-              onClick={() => irPara(item.rota)}
+              onClick={() => navegar(item.rota)}
             >
               <span>{item.label}</span>
               <span className="chevron">›</span>
