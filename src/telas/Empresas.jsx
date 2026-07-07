@@ -788,7 +788,10 @@ export default function Empresas() {
                     {e.rh_contatos.map((c) => (
                       <div className="rh-linha" key={c.id}>
                         <span className="rh-info">
-                          <span className="rh-nome">{c.nome || '—'}</span>
+                          <span className="rh-nome">
+                            {c.nome || '—'}
+                            {c.eh_rh && <span className="tag-rh-mini">RH</span>}
+                          </span>
                           <small className="rh-cargo">{c.cargo || '—'}</small>
                         </span>
                         {c.email ? (
