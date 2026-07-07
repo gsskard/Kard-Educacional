@@ -721,19 +721,27 @@ export default function Empresas() {
               <div className="empresa-linha"><span className="chave">Categoria</span><span>{e.categoria || '—'}</span></div>
 
               <div className="empresa-rh">
-                <div className="chave">E-mails de RH ({(e.emails_rh || []).length})</div>
+                <div className="chave">
+                  Contatos encontrados: {e.total_prospects ?? 0}
+                  {(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} de RH</span>}
+                </div>
                 {(e.emails_rh && e.emails_rh.length > 0) ? (
-                  e.emails_rh.map((em, j) => (
-                    <div className="rh-item" key={j}>
-                      <span className="rh-info">
-                        <span>{em.email || em}</span>
-                        {em.cargo && <small className="rh-cargo">{em.cargo}</small>}
-                      </span>
-                      <PillEmail valido={em.valido} />
-                    </div>
-                  ))
+                  <>
+                    <small className="ajuda">E-mails já liberados ({e.emails_rh.length}):</small>
+                    {e.emails_rh.map((em, j) => (
+                      <div className="rh-item" key={j}>
+                        <span className="rh-info">
+                          <span>{em.email || em}</span>
+                          {em.cargo && <small className="rh-cargo">{em.cargo}</small>}
+                        </span>
+                        <PillEmail valido={em.valido} />
+                      </div>
+                    ))}
+                  </>
+                ) : (e.total_prospects ?? 0) > 0 ? (
+                  <span className="ajuda">Nenhum e-mail liberado ainda — use “liberar RH” para revelar (custo: 1 crédito por e-mail).</span>
                 ) : (
-                  <span className="ajuda">nenhum e-mail encontrado</span>
+                  <span className="ajuda">Nenhum contato encontrado para este domínio.</span>
                 )}
               </div>
 

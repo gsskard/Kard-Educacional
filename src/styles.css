@@ -340,6 +340,7 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .rh-meter .btn-primario + .btn-refresh { margin-left: 0; }
 
 .dom-select { border: 1px solid var(--borda-forte); border-radius: 8px; padding: 5px 8px; font-size: 12px; background: var(--card); color: var(--navy-800); max-width: 200px; }
+.tag-rh { color: var(--verde-600); font-weight: 700; }
 
 /* planilha de RH (1 linha por contato, agrupada por empresa) */
 .rh-wrap { border: 1px solid var(--borda); border-radius: 14px; overflow: auto; background: var(--card); box-shadow: 0 1px 3px rgba(30,43,77,.05); }
