@@ -647,7 +647,7 @@ export default function Empresas() {
         <ValidacaoLote onEnriquecido={carregar} />
       ) : (
       <>
-      <p className="ajuda">Empresas enriquecidas via Hunter: domínio, site, localização, nº de funcionários, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
+      <p className="ajuda">Empresas enriquecidas via Snov.io: domínio, site, localização, porte, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
 
       {erro && <div className="banner">{erro}</div>}
       {msg && <div className="banner">{msg}</div>}
@@ -692,7 +692,8 @@ export default function Empresas() {
               )}
               <div className="empresa-linha"><span className="chave">Site</span>{e.site ? <a href={e.site} target="_blank" rel="noreferrer">{e.site}</a> : <span>—</span>}</div>
               <div className="empresa-linha"><span className="chave">Localização</span><span>{e.localizacao || '—'}</span></div>
-              <div className="empresa-linha"><span className="chave">Funcionários</span><span>{e.funcionarios || '—'}</span></div>
+              <div className="empresa-linha"><span className="chave">Porte</span><span>{e.porte || '—'}</span></div>
+              <div className="empresa-linha"><span className="chave">Capital social</span><span>{e.capital_social || '—'}</span></div>
               <div className="empresa-linha"><span className="chave">Categoria</span><span>{e.categoria || '—'}</span></div>
 
               <div className="empresa-rh">
@@ -725,7 +726,7 @@ export default function Empresas() {
             <thead>
               <tr>
                 <th></th><th>Empresa</th><th>CNPJ</th><th>Localização</th>
-                <th>Funcionários</th><th>Categoria</th><th>Domínio</th>
+                <th>Porte</th><th>Categoria</th><th>Domínio</th>
                 <th>E-mails RH</th><th>Enriquecido</th>
               </tr>
             </thead>
@@ -741,7 +742,7 @@ export default function Empresas() {
                       <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{e.empresa || '—'}</span></td>
                       <td>{e.cnpj || '—'}</td>
                       <td>{e.localizacao || '—'}</td>
-                      <td>{e.funcionarios || '—'}</td>
+                      <td>{e.porte || '—'}</td>
                       <td>{e.categoria || '—'}</td>
                       <td>{e.dominio || '—'}</td>
                       <td>{emails.length}</td>
