@@ -731,7 +731,7 @@ export default function Empresas() {
               {visiveis.flatMap((e, i) => {
                 const emails = e.emails_rh || []
                 const cnpj = e.cnpj || '—'
-                const cabec = (contadorClasse) => (
+                const cabec = () => (
                   <>
                     <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={22} />{e.empresa || '—'}</span></td>
                     <td>{cnpj}</td>
