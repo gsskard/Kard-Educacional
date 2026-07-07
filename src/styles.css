@@ -25,7 +25,9 @@ button { font-family: inherit; cursor: pointer; }
 h1, h2 { color: var(--navy); }
 
 /* ===== Estrutura ===== */
-.shell { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+.shell { --sidebar-w: 250px; display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+.shell.recolhido { --sidebar-w: 0px; }
+.shell.recolhido .sidebar { display: none; }
 .main-wrap { display: flex; flex-direction: column; min-width: 0; }
 
 /* ===== Sidebar ===== */
@@ -60,7 +62,13 @@ h1, h2 { color: var(--navy); }
   background: var(--card); border-bottom: 1px solid var(--borda);
   padding: 16px 28px;
 }
-.breadcrumb { font-size: 14px; color: var(--muted); }
+.breadcrumb { display: flex; align-items: center; font-size: 14px; color: var(--muted); }
+.btn-menu-toggle {
+  background: transparent; border: 1px solid var(--borda); color: var(--navy);
+  width: 34px; height: 34px; border-radius: 9px; font-size: 17px; line-height: 1;
+  cursor: pointer; margin-right: 14px; display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-menu-toggle:hover { background: #f1f4f9; }
 .crumb-sep { margin: 0 8px; }
 .crumb-atual { color: var(--navy); font-weight: 600; }
 .usuario { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--navy); }
@@ -360,7 +368,7 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .dom-cand .btn-mini { flex: none; }
 
 /* visão Tabela ocupando a largura da tela (quebra o max-width do conteúdo) */
-.tabela-full { max-width: none; width: calc(100vw - 278px); margin-left: -28px; }
+.tabela-full { max-width: none; width: calc(100vw - var(--sidebar-w) - 28px); margin-left: -28px; }
 
 /* lista de RH estilo prospecção: nome/cargo à esquerda, e-mail ou olho à direita */
 .rh-lista { display: flex; flex-direction: column; margin-top: 4px; }
