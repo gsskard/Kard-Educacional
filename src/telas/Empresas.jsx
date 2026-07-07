@@ -29,12 +29,8 @@ function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
     if (ex) { if (ex.count == null) ex.count = s.total }
     else mapa.set(s.domain, { domain: s.domain, count: s.total ?? 0, oficial: false })
   }
-  // Só mostra domínios com e-mails (>0) — mas sempre mantém o oficial (★) e o
-  // domínio em uso, mesmo com 0 — pra não poluir com os chutes que a busca gera.
-  const cands = [...mapa.values()]
-    .filter((c) => (c.count || 0) > 0 || c.oficial || c.domain === empresa.dominio)
-    .sort((a, b) => (b.count || 0) - (a.count || 0))
-    .slice(0, 10)
+  // Mostra todos os candidatos (mesmo os de 0 e-mail), ordenados por quantidade.
+  const cands = [...mapa.values()].sort((a, b) => (b.count || 0) - (a.count || 0))
   const carregando = live === null
 
   return (
