@@ -1,37 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 
-// Seletor de domínio: mostra sugestões (Clearbit) + campo manual, pra o usuário
-// escolher o domínio certo quando o nome é ambíguo (ex.: Kard, O Boticário).
-function DomainPicker({ nome, onEscolher, onFechar }) {
-  const [sug, setSug] = useState([])
+// Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
+// Mostramos como hashtags no card pra deixar claro que contatos buscamos.
+const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people']
+
+// Painel de troca de domínio: lista os domínios que a IA/Snov acharam com a
+// contagem de e-mails públicos (grátis) + campo manual. Clicar em "enriquecer"
+// re-busca os contatos de RH por aquele domínio — aí sim gasta crédito Snov.
+function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
   const [manual, setManual] = useState('')
-  const [carregando, setCarregando] = useState(true)
-  useEffect(() => {
-    let ativo = true
-    sugerirDominios(nome).then((s) => { if (ativo) { setSug(s); setCarregando(false) } })
-    return () => { ativo = false }
-  }, [nome])
+  const cands = (empresa.candidatos || []).slice().sort((a, b) => (b.emails || 0) - (a.emails || 0))
   return (
     <div className="dominio-picker">
-      <div className="ajuda">Qual o domínio correto de <b>{nome}</b>?</div>
-      {carregando ? (
-        <div className="ajuda">buscando sugestões…</div>
-      ) : sug.length > 0 ? (
-        sug.map((s) => (
-          <button key={s.domain} className="dom-opcao" onClick={() => onEscolher(s.domain)}>
-            <CompanyLogo dominio={s.domain} nome={s.domain} size={20} />
-            <span className="dom-nome">{s.domain}</span>
-            <small>{s.total} e-mail(s)</small>
-          </button>
+      <div className="ajuda">
+        Domínios encontrados para <b>{empresa.empresa}</b> — o número é de e-mails públicos (grátis).
+        <b> Enriquecer</b> busca os contatos de RH na Snov e <b>gasta crédito</b>.
+      </div>
+      {cands.length > 0 ? (
+        cands.map((c) => (
+          <div key={c.domain} className={'dom-cand' + (c.domain === empresa.dominio ? ' atual' : '')}>
+            <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
+            <span className="dom-nome">{c.domain}{c.oficial ? ' ★' : ''}</span>
+            <small>{c.emails ?? 0} e-mail(s)</small>
+            <button className="btn-mini" onClick={() => onEnriquecer(c.domain)}>enriquecer</button>
+          </div>
         ))
       ) : (
-        <div className="ajuda">Sem sugestões — digite o domínio abaixo.</div>
+        <div className="ajuda">Sem candidatos salvos ainda — digite o domínio abaixo e clique em usar.</div>
       )}
       <div className="dom-manual">
         <input placeholder="ex.: kard.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
-        <button className="btn-mini" disabled={!manual.trim()} onClick={() => onEscolher(manual.trim())}>usar</button>
+        <button className="btn-mini" disabled={!manual.trim()} onClick={() => onEnriquecer(manual.trim())}>usar</button>
         <button className="btn-mini" onClick={onFechar}>fechar</button>
       </div>
     </div>
@@ -681,14 +682,13 @@ export default function Empresas() {
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
-        <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Baixar CSV (abre no Excel)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Exportar Excel" aria-label="Exportar Excel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" fill="#fff" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
             <path d="M13 2v7h7" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
             <rect x="7" y="12" width="10" height="7" rx="1" fill="#1D6F42"/>
             <path d="M9.4 13.7l3.2 3.6M12.6 13.7l-3.2 3.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round"/>
           </svg>
-          Exportar Excel
         </button>
         <div className="view-toggle">
           <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Cartões</button>
