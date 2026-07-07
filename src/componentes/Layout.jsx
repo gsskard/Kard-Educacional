@@ -73,8 +73,6 @@ export default function Layout({ rota, children }) {
         <header className="topbar">
           <div className="breadcrumb">
             <button className="btn-menu-toggle" onClick={alternarMenu} title={recolhido ? 'Expandir menu' : 'Recolher menu'} aria-label="Recolher/expandir menu">☰</button>
-            <span className="crumb">Kard CRM</span>
-            <span className="crumb-sep">›</span>
             <span className="crumb-atual">{tituloAtual}</span>
           </div>
           <div className="usuario">
