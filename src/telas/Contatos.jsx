@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarContatos, listarEmpresas, enriquecerEmpresa } from '../api/n8n'
-import PillStatus from '../componentes/PillStatus'
 import CompanyLogo from '../componentes/CompanyLogo'
 
 // Tela de Contatos (RF-33 a RF-38): a "casa" dos dados que retroalimentam
@@ -49,10 +48,12 @@ export default function Contatos() {
   }, [empresas])
 
   const visiveis = useMemo(() => {
+    // só contatos com e-mail desbloqueado
+    const comEmail = rows.filter((r) => r.email && String(r.email).trim())
     const q = busca.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((r) =>
-      [r.nome, r.empresa, r.email].some((c) => String(c || '').toLowerCase().includes(q))
+    if (!q) return comEmail
+    return comEmail.filter((r) =>
+      [r.nome, r.cargo, r.empresa, r.cnpj, r.email].some((c) => String(c || '').toLowerCase().includes(q))
     )
   }, [rows, busca])
 
@@ -104,8 +105,8 @@ export default function Contatos() {
         <table className="preview">
           <thead>
             <tr>
-              <th></th><th>Nome</th><th>Empresa</th><th>E-mail</th>
-              <th>Etapa</th><th>Status envio</th><th>Enriquecimento</th><th></th>
+              <th></th><th>Nome</th><th>Cargo</th><th>Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
+              <th>Enriquecimento</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -115,15 +116,16 @@ export default function Contatos() {
                 <tr key={r.id ?? i}>
                   <td><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
                   <td>{r.nome || '—'}</td>
+                  <td>{r.cargo || '—'}</td>
                   <td>
                     <span className="empresa-cel">
-                      <CompanyLogo dominio={emp?.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
+                      <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
                       {r.empresa || '—'}
                     </span>
                   </td>
+                  <td>{r.cnpj || '—'}</td>
+                  <td>{r.dominio || '—'}</td>
                   <td>{r.email || '—'}</td>
-                  <td>{r.etapa || '—'}</td>
-                  <td><PillStatus status={r.status_envio} /></td>
                   <td>
                     {emp
                       ? <span className="pill pill-ok">enriquecida{emp.enriquecido_em ? ' ' + emp.enriquecido_em : ''}</span>
@@ -133,7 +135,7 @@ export default function Contatos() {
                 </tr>
               )
             })}
-            {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhum contato.</td></tr>}
+            {visiveis.length === 0 && <tr><td colSpan={9} className="empty">Nenhum contato.</td></tr>}
           </tbody>
         </table>
       )}
