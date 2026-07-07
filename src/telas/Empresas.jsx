@@ -804,16 +804,6 @@ export default function Empresas() {
             <path d="M9.4 13.7l3.2 3.6M12.6 13.7l-3.2 3.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round"/>
           </svg>
         </button>
-        {view === 'tabela' && (
-          <button className={mostrarSemEmail ? 'btn-primario' : 'btn-refresh'} onClick={() => setMostrarSemEmail((v) => !v)}
-            title="Exibir também os contatos que ainda não têm e-mail desbloqueado">
-            {mostrarSemEmail ? 'Ocultar sem e-mail' : 'Mostrar sem e-mail'}
-          </button>
-        )}
-        <div className="view-toggle">
-          <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Por empresa</button>
-          <button className={view === 'tabela' ? 'ativo' : ''} onClick={() => setView('tabela')}>Por contato</button>
-        </div>
       </div>
 
       {loading ? (
