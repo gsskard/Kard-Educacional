@@ -21,19 +21,17 @@ export default function Contatos() {
 
   async function carregar() {
     setLoading(true); setErro('')
+    // contatos primeiro: assim que chega, a tela já aparece
     try {
-      // busca contatos e empresas juntos (empresas pode falhar sem quebrar a tela)
-      const [contatos, emps] = await Promise.all([
-        listarContatos(),
-        listarEmpresas().catch(() => []),
-      ])
+      const contatos = await listarContatos()
       setRows(contatos)
-      setEmpresas(emps)
     } catch (e) {
-      setErro('Não consegui carregar do n8n (' + e.message + ')')
+      setErro('Não consegui carregar os contatos do n8n (' + e.message + ')')
     } finally {
       setLoading(false)
     }
+    // empresas em paralelo, só para cruzar logo/enriquecimento — nunca trava a tela
+    listarEmpresas().then(setEmpresas).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
 
