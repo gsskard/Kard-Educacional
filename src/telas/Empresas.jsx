@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
@@ -11,24 +11,46 @@ const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people
 // re-busca os contatos de RH por aquele domínio — aí sim gasta crédito Snov.
 function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
   const [manual, setManual] = useState('')
-  const cands = (empresa.candidatos || []).slice().sort((a, b) => (b.emails || 0) - (a.emails || 0))
+  const [live, setLive] = useState(null)   // null = buscando; [] = sem sugestões
+  useEffect(() => {
+    let ativo = true
+    sugerirDominios(empresa.empresa).then((s) => { if (ativo) setLive(s || []) })
+    return () => { ativo = false }
+  }, [empresa.empresa])
+
+  // Junta os candidatos salvos (Snov, com ★ oficial) com as sugestões ao vivo
+  // (Hunter), sem duplicar domínio, e ordena por quantidade de e-mails.
+  const mapa = new Map()
+  for (const c of (empresa.candidatos || [])) {
+    mapa.set(c.domain, { domain: c.domain, count: c.emails ?? 0, oficial: c.oficial === true })
+  }
+  for (const s of (live || [])) {
+    const ex = mapa.get(s.domain)
+    if (ex) { if (ex.count == null) ex.count = s.total }
+    else mapa.set(s.domain, { domain: s.domain, count: s.total ?? 0, oficial: false })
+  }
+  const cands = [...mapa.values()].sort((a, b) => (b.count || 0) - (a.count || 0))
+  const carregando = live === null
+
   return (
     <div className="dominio-picker">
       <div className="ajuda">
-        Domínios encontrados para <b>{empresa.empresa}</b> — o número é de e-mails públicos (grátis).
+        Domínios de <b>{empresa.empresa}</b> — o número é de e-mails públicos (grátis).
         <b> Enriquecer</b> busca os contatos de RH na Snov e <b>gasta crédito</b>.
       </div>
-      {cands.length > 0 ? (
+      {carregando ? (
+        <div className="ajuda">buscando domínios…</div>
+      ) : cands.length > 0 ? (
         cands.map((c) => (
           <div key={c.domain} className={'dom-cand' + (c.domain === empresa.dominio ? ' atual' : '')}>
             <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
             <span className="dom-nome">{c.domain}{c.oficial ? ' ★' : ''}</span>
-            <small>{c.emails ?? 0} e-mail(s)</small>
+            <small>{c.count ?? 0} e-mail(s)</small>
             <button className="btn-mini" onClick={() => onEnriquecer(c.domain)}>enriquecer</button>
           </div>
         ))
       ) : (
-        <div className="ajuda">Sem candidatos salvos ainda — digite o domínio abaixo e clique em usar.</div>
+        <div className="ajuda">Sem candidatos — digite o domínio abaixo e clique em usar.</div>
       )}
       <div className="dom-manual">
         <input placeholder="ex.: kard.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
