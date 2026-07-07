@@ -78,8 +78,19 @@ function PillEmail({ valido }) {
 // O analista escolhe o certo e clica "enriquecer" só nesse (aí sim gasta cota).
 // -------------------------------------------------------------------------
 
+// Reduz uma URL/site a só o host (tira https://, www e o caminho): a Snov
+// e o rh-preview esperam o domínio "pelado" (ex.: magazineluiza.com.br).
+function soHost(v) {
+  let s = String(v || '').trim().toLowerCase()
+  if (!s) return ''
+  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '')
+  s = s.split('/')[0].split('?')[0].split('#')[0]
+  return s.trim()
+}
+
 // Lê um CSV simples (delimitador , ou ;). Aceita cabeçalho com colunas
-// empresa/nome/razão social e cnpj; sem cabeçalho, adivinha pelas colunas.
+// empresa/nome/razão social, cnpj e — opcional — site/domínio; sem cabeçalho,
+// adivinha pelas colunas (CNPJ pelos dígitos, domínio pelo ponto sem espaço).
 function parseCSV(texto) {
   const linhas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (!linhas.length) return []
@@ -88,26 +99,32 @@ function parseCSV(texto) {
   const norm = (h) => h.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
   const head = split(linhas[0]).map(norm)
   const colsEmp = ['empresa', 'nome', 'razaosocial', 'cliente', 'empregador']
-  const temHeader = head.some((h) => colsEmp.includes(h) || h === 'cnpj')
-  let idxEmp = -1, idxCnpj = -1
+  const colsDom = ['dominio', 'site', 'url', 'website', 'link', 'dominiocorporativo', 'pagina']
+  const temHeader = head.some((h) => colsEmp.includes(h) || h === 'cnpj' || colsDom.includes(h))
+  let idxEmp = -1, idxCnpj = -1, idxDom = -1
   if (temHeader) {
     idxEmp = head.findIndex((h) => colsEmp.includes(h))
     idxCnpj = head.findIndex((h) => h === 'cnpj')
+    idxDom = head.findIndex((h) => colsDom.includes(h))
   }
   const corpo = temHeader ? linhas.slice(1) : linhas
   const out = []
   for (const l of corpo) {
     const cols = split(l)
-    let empresa = '', cnpj = ''
+    let empresa = '', cnpj = '', dominio = ''
     if (temHeader) {
       empresa = idxEmp >= 0 ? (cols[idxEmp] || '') : ''
       cnpj = idxCnpj >= 0 ? (cols[idxCnpj] || '') : ''
+      dominio = idxDom >= 0 ? soHost(cols[idxDom]) : ''
     } else {
       const cnpjCol = cols.find((c) => c.replace(/\D/g, '').length >= 11)
       cnpj = cnpjCol || ''
-      empresa = cols.find((c) => c && c !== cnpjCol) || cols[0] || ''
+      // domínio = coluna com ponto, sem espaço, que não seja o CNPJ
+      const domCol = cols.find((c) => c !== cnpjCol && /\./.test(c) && !/\s/.test(c) && c.replace(/\D/g, '').length < 11)
+      dominio = soHost(domCol)
+      empresa = cols.find((c) => c && c !== cnpjCol && c !== domCol) || cols[0] || ''
     }
-    if (empresa) out.push({ empresa, cnpj })
+    if (empresa) out.push({ empresa, cnpj, dominio })
   }
   return out
 }
@@ -305,11 +322,26 @@ function ValidacaoLote({ onEnriquecido }) {
     })
   }
 
+  // Monta as linhas da "planilha" a partir dos registros importados (com domínio).
+  // melhor_dominio já vem da planilha; candidatos = só esse domínio (marcado oficial).
+  const semear = (registros) => registros.map((r) => ({
+    empresa: r.empresa,
+    cnpj: r.cnpj,
+    melhor_dominio: r.dominio || '',
+    candidatos: r.dominio ? [{ domain: r.dominio, total: null, oficial: true }] : [],
+  }))
+
   // Retoma o último lote ao abrir a aba — permite fechar a tela e voltar depois.
   useEffect(() => {
     let salvo = null
     try { salvo = JSON.parse(localStorage.getItem('kard_lote') || 'null') } catch { salvo = null }
-    if (salvo && salvo.loteId) { setLote(salvo); acompanhar(salvo.loteId, salvo.total) }
+    if (salvo && salvo.loteId) {
+      setLote(salvo)
+      // lote local (importado com domínio) não tem processamento no servidor:
+      // reconstrói a planilha a partir dos registros salvos, sem polling.
+      if (salvo.local && Array.isArray(salvo.registros)) setResultados(semear(salvo.registros))
+      else acompanhar(salvo.loteId, salvo.total)
+    }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -362,6 +394,22 @@ function ValidacaoLote({ onEnriquecido }) {
     } catch (err) {
       setMsg('⏳ ' + err.message)
     }
+  }
+
+  // ATALHO (grátis, sem servidor): a planilha já tem o site/domínio → pulamos a
+  // descoberta pela Receita. Semeamos a planilha na hora; o "Listar RH de todas"
+  // chama o rh-preview já com o domínio (busca direto na Snov, sem espera 3/min).
+  function importarComDominio() {
+    if (!entrada.length) return
+    const comDom = entrada.filter((r) => r.dominio).length
+    const loteId = 'LOCAL-' + Date.now() + '-' + Math.floor(Math.random() * 1000)
+    const info = { loteId, total: entrada.length, local: true, registros: entrada }
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setResultados(semear(entrada))
+    setLote(info)
+    localStorage.setItem('kard_lote', JSON.stringify(info))
+    setMsg(`${entrada.length} empresa(s) importada(s) — ${comDom} já com domínio (descoberta pulada). ` +
+      `Clique em "Listar RH de todas (grátis)" para trazer os contatos. Só gasta crédito ao liberar/validar um e-mail.`)
   }
 
   function novoLote() {
@@ -424,10 +472,11 @@ function ValidacaoLote({ onEnriquecido }) {
   return (
     <div>
       <p className="ajuda">
-        Suba um CSV com <b>CNPJ</b> e <b>nome da empresa</b> (colunas <code>empresa</code> e <code>cnpj</code>).
-        O servidor processa <b>~3 empresas por minuto</b> (limite da Receita) e vai salvando os resultados —
-        então <b>pode fechar a tela e voltar depois</b>. Listar o RH é <b>grátis</b>; só gasta crédito Snov ao
-        <b> liberar</b> ou <b>validar</b> um e-mail — e dá pra fazer em lote pelos botões do topo.
+        Suba um CSV com <b>nome da empresa</b> e <b>CNPJ</b> (colunas <code>empresa</code>, <code>cnpj</code>) e,
+        se tiver, <b>site/domínio</b> (coluna <code>site</code> ou <code>dominio</code>). Com o domínio na planilha,
+        clique em <b>“Importar”</b> — pulamos a descoberta pela Receita (sem espera de ~3/min). Sem domínio, use
+        <b> “Descobrir domínio”</b>: o servidor acha ~3/empresa por minuto e vai salvando (<b>pode fechar e voltar</b>).
+        Listar o RH é <b>grátis</b>; só gasta crédito Snov ao <b>liberar</b> ou <b>validar</b> um e-mail.
       </p>
 
       {msg && <div className="banner">{msg}</div>}
@@ -444,21 +493,32 @@ function ValidacaoLote({ onEnriquecido }) {
           </div>
           <textarea
             className="lote-textarea"
-            placeholder={'empresa;cnpj\nMagazine Luiza;47.960.950/0001-21\nO Boticário;'}
+            placeholder={'empresa;cnpj;site\nMagazine Luiza;47.960.950/0001-21;magazineluiza.com.br\nO Boticário;;boticario.com.br'}
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             rows={4}
           />
+          {entrada.length > 0 && (
+            <div className="ajuda lote-lida">
+              {entrada.length} empresa(s) lida(s){' '}
+              {entrada.filter((r) => r.dominio).length > 0 && <b>· {entrada.filter((r) => r.dominio).length} com domínio</b>}
+            </div>
+          )}
           <div className="toolbar">
             <button className="btn-refresh" onClick={carregarTexto} disabled={!texto.trim()}>Ler texto colado</button>
-            <button className="btn-primario" onClick={validar} disabled={!entrada.length}>
-              {`Validar ${entrada.length || ''} empresa(s)`}
+            {entrada.some((r) => r.dominio) && (
+              <button className="btn-primario" onClick={importarComDominio} title="A planilha já tem o domínio — pula a descoberta pela Receita">
+                {`Importar ${entrada.length} (já tem domínio)`}
+              </button>
+            )}
+            <button className={entrada.some((r) => r.dominio) ? 'btn-refresh' : 'btn-primario'} onClick={validar} disabled={!entrada.length} title="Descobre o domínio de cada empresa pela Receita (~3/min)">
+              {`Descobrir domínio de ${entrada.length || ''} empresa(s)`}
             </button>
           </div>
         </>
       ) : (
         <div className="toolbar">
-          <span className="ajuda">Lote em andamento: <b>{feitas}/{total}</b> concluídas.</span>
+          <span className="ajuda">{lote.local ? <><b>{feitas}</b> empresa(s) importada(s).</> : <>Lote em andamento: <b>{feitas}/{total}</b> concluídas.</>}</span>
           {feitas > 0 && <button className="btn-refresh" onClick={baixarCSV}>Baixar resultado (CSV)</button>}
           <button className="btn-refresh" onClick={novoLote}>Novo lote</button>
         </div>
