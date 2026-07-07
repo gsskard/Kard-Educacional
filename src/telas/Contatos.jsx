@@ -209,7 +209,7 @@ export default function Contatos() {
         <table className="preview">
           <thead>
             <tr>
-              <th></th><th>Nome</th><th>Cargo</th><th className="col-cen">Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
+              <th></th><th>Nome</th><th className="col-cen">Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
               <th>Enriquecimento</th><th></th>
             </tr>
           </thead>
@@ -219,8 +219,12 @@ export default function Contatos() {
               return (
                 <tr key={r.id ?? i} className={r.empresa ? 'linha-clicavel' : ''} onClick={r.empresa ? () => setEmpresaAberta(r.empresa) : undefined} title={r.empresa ? 'Ver empresa' : undefined}>
                   <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
-                  <td>{r.nome || '—'}</td>
-                  <td>{r.cargo || '—'}</td>
+                  <td>
+                    <div className="contato-nome">
+                      <strong>{r.nome || '—'}</strong>
+                      {r.cargo && <small className="contato-cargo">{r.cargo}</small>}
+                    </div>
+                  </td>
                   <td className="col-cen" title={r.empresa || ''}>
                     <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={28} />
                   </td>
@@ -236,7 +240,7 @@ export default function Contatos() {
                 </tr>
               )
             })}
-            {visiveis.length === 0 && <tr><td colSpan={9} className="empty">Nenhum contato.</td></tr>}
+            {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhum contato.</td></tr>}
           </tbody>
         </table>
       )}

@@ -90,6 +90,11 @@ h1, h2 { color: var(--navy); }
   font: inherit; color: var(--navy); text-align: left; }
 .empresa-link:hover { color: var(--verde-600); text-decoration: underline; }
 
+/* nome + cargo (subtítulo verde) na tabela de Contatos */
+.contato-nome { display: flex; flex-direction: column; line-height: 1.3; }
+.contato-nome strong { color: var(--navy); font-weight: 600; }
+.contato-cargo { color: var(--verde-600); font-size: 12px; }
+
 /* linha clicável (tabelas "Por empresa" e Contatos) */
 .preview tr.linha-clicavel, .grade tr.linha-clicavel { cursor: pointer; }
 .preview tr.linha-clicavel:hover td, .grade tr.linha-clicavel:hover td { background: #f0fdf4; }
@@ -444,7 +449,7 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .rh-linha.rh-alvo .rh-email-ok a { color: #dcfce7; }
 .rh-linha.rh-alvo .btn-olho { color: #fff; border-color: rgba(255,255,255,.5); }
 .rh-linha.rh-alvo .btn-olho:hover:not(:disabled) { background: rgba(255,255,255,.15); border-color: #fff; }
-.rh-linha .rh-cargo { color: var(--muted); font-size: 11px; }
+.rh-linha .rh-cargo { color: var(--verde-600); font-size: 11px; }
 .rh-email-ok { display: inline-flex; align-items: center; gap: 8px; flex: none; }
 .rh-email-ok a { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--verde-600); text-decoration: none; }
 .rh-email-ok a:hover { text-decoration: underline; }
