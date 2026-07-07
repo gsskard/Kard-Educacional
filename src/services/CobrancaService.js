@@ -15,6 +15,11 @@ export class CobrancaService {
     return lista.map(Contato.fromJson)
   }
 
+  // POST /crm-cobranca/contatos-importar — grava uma base de contatos no banco (rh_enriquecimento).
+  importarContatos(contatos) {
+    return this.api.post('/crm-cobranca/contatos-importar', { contatos })
+  }
+
   // POST /crm-cobranca/update — move um contato de etapa.
   moverContato(id, etapa) {
     return this.api.post('/crm-cobranca/update', { id, etapa })

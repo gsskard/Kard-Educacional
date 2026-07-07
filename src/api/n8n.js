@@ -12,6 +12,7 @@ import { rhService } from '../services/RhService'
 
 // --- Cobrança / contatos ---
 export const listarContatos = () => cobrancaService.listarContatos()
+export const importarContatos = (contatos) => cobrancaService.importarContatos(contatos)
 export const moverContato = (id, etapa) => cobrancaService.moverContato(id, etapa)
 export const importarCarga = (etapa, registros) => cobrancaService.importarCarga(etapa, registros)
 export const dispararEtapa = (etapa, modelo) => cobrancaService.dispararEtapa(etapa, modelo)
