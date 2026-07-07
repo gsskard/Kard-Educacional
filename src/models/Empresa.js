@@ -6,6 +6,8 @@ export class Empresa {
     this.emails_rh = Empresa.parseEmails(dados.emails_rh)
     // candidatos de domínio (IA/Snov): pode vir array (já parseado) ou texto JSON.
     this.candidatos = Empresa.parseEmails(dados.candidatos)
+    // contatos de RH (revelados ou não) — cada um com id p/ desbloquear o e-mail.
+    this.rh_contatos = Empresa.parseEmails(dados.rh_contatos)
   }
 
   // `emails_rh` pode vir como array (já parseado) ou string JSON (do banco).

@@ -582,6 +582,7 @@ export default function Empresas() {
   const [view, setView] = useState('cards')         // 'cards' | 'tabela'
   const [emLote, setEmLote] = useState(false)
   const [pickerKey, setPickerKey] = useState(null)  // card com o seletor de domínio aberto
+  const [revelando, setRevelando] = useState(new Set()) // ids de RH sendo desbloqueados
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -681,6 +682,22 @@ export default function Empresas() {
     }
   }
 
+  // PAGO: desbloqueia o e-mail de um contato de RH (1 crédito Snov, se achado).
+  // Idempotente no back — reclicar num já revelado não recobra.
+  async function desbloquear(e, contato) {
+    if (revelando.has(contato.id)) return
+    if (!window.confirm(`Desbloquear o e-mail de ${contato.nome || 'este contato'}?\nGasta 1 crédito Snov (se o e-mail for encontrado).`)) return
+    setRevelando((prev) => new Set(prev).add(contato.id))
+    try {
+      await rhRevelar(e.cnpj, [contato.id], 'selecionados')
+      await carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    } finally {
+      setRevelando((prev) => { const s = new Set(prev); s.delete(contato.id); return s })
+    }
+  }
+
   return (
     <div>
       <header className="pagina-head"><h1>Empresas</h1></header>
@@ -766,21 +783,44 @@ export default function Empresas() {
                 <div className="cargos-alvo">
                   {CARGOS_ALVO.map((c) => <span className="hashtag" key={c}>#{c.replace(/\s+/g, '')}</span>)}
                 </div>
-                {(e.emails_rh && e.emails_rh.length > 0) ? (
-                  <>
-                    <small className="ajuda">E-mails já liberados ({e.emails_rh.length}):</small>
-                    {e.emails_rh.map((em, j) => (
-                      <div className="rh-item" key={j}>
+                {(e.rh_contatos && e.rh_contatos.length > 0) ? (
+                  <div className="rh-lista">
+                    {e.rh_contatos.map((c) => (
+                      <div className="rh-linha" key={c.id}>
                         <span className="rh-info">
-                          <span>{em.email || em}</span>
-                          {em.cargo && <small className="rh-cargo">{em.cargo}</small>}
+                          <span className="rh-nome">{c.nome || '—'}</span>
+                          <small className="rh-cargo">{c.cargo || '—'}</small>
                         </span>
-                        <PillEmail valido={em.valido} />
+                        {c.email ? (
+                          <span className="rh-email-ok">
+                            <a href={`mailto:${c.email}`}>{c.email}</a>
+                            <PillEmail valido={c.valido} />
+                          </span>
+                        ) : (
+                          <button
+                            className="btn-olho"
+                            title="Desbloquear e-mail (1 crédito Snov)"
+                            disabled={revelando.has(c.id)}
+                            onClick={() => desbloquear(e, c)}
+                          >
+                            {revelando.has(c.id) ? (
+                              '…'
+                            ) : (
+                              <>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                                </svg>
+                                desbloquear
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     ))}
-                  </>
+                  </div>
                 ) : (e.total_prospects ?? 0) > 0 ? (
-                  <span className="ajuda">Nenhum e-mail liberado ainda — use “liberar RH” para revelar (custo: 1 crédito por e-mail).</span>
+                  <span className="ajuda">Contatos encontrados, mas nenhum classificado como RH neste domínio. Use “trocar” pra revisar o domínio.</span>
                 ) : (
                   <span className="ajuda">Nenhum contato encontrado para este domínio.</span>
                 )}

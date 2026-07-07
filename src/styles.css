@@ -362,6 +362,20 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 /* visão Tabela ocupando a largura da tela (quebra o max-width do conteúdo) */
 .tabela-full { max-width: none; width: calc(100vw - 278px); margin-left: -28px; }
 
+/* lista de RH estilo prospecção: nome/cargo à esquerda, e-mail ou olho à direita */
+.rh-lista { display: flex; flex-direction: column; margin-top: 4px; }
+.rh-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--borda); }
+.rh-linha:last-child { border-bottom: none; }
+.rh-linha .rh-info { display: flex; flex-direction: column; min-width: 0; }
+.rh-nome { font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rh-linha .rh-cargo { color: var(--muted); font-size: 11px; }
+.rh-email-ok { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.rh-email-ok a { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--verde-600); text-decoration: none; }
+.rh-email-ok a:hover { text-decoration: underline; }
+.btn-olho { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid var(--borda-forte); background: transparent; color: var(--verde-600); border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.btn-olho:hover:not(:disabled) { background: var(--verde-50); border-color: var(--verde); }
+.btn-olho:disabled { opacity: .6; cursor: default; }
+
 /* planilha de RH (1 linha por contato, agrupada por empresa) */
 .rh-wrap { border: 1px solid var(--borda); border-radius: 14px; overflow: auto; background: var(--card); box-shadow: 0 1px 3px rgba(30,43,77,.05); }
 .planilha-rh { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
