@@ -4,6 +4,8 @@ export class Empresa {
   constructor(dados = {}) {
     Object.assign(this, dados)
     this.emails_rh = Empresa.parseEmails(dados.emails_rh)
+    // candidatos de domínio (IA/Snov): pode vir array (já parseado) ou texto JSON.
+    this.candidatos = Empresa.parseEmails(dados.candidatos)
   }
 
   // `emails_rh` pode vir como array (já parseado) ou string JSON (do banco).

@@ -716,11 +716,18 @@ export default function Empresas() {
                 <span className="chave">Domínio</span>
                 <span className="dom-linha">
                   {e.dominio || '—'}
+                  {e.dominio_count != null && <small className="dom-count">· {e.dominio_count} e-mail(s)</small>}
                   <button className="link-mini" onClick={() => setPickerKey(pickerKey === (e.cnpj || e.empresa || i) ? null : (e.cnpj || e.empresa || i))}>trocar</button>
                 </span>
               </div>
               {pickerKey === (e.cnpj || e.empresa || i) && (
-                <DomainPicker nome={e.empresa} onEscolher={(dom) => escolherDominio(e, dom)} onFechar={() => setPickerKey(null)} />
+                <TrocaDominio
+                  empresa={e}
+                  onEnriquecer={(dom) => {
+                    if (window.confirm(`Enriquecer "${e.empresa}" pelo domínio ${dom}?\nIsso busca os contatos de RH na Snov e gasta crédito.`)) escolherDominio(e, dom)
+                  }}
+                  onFechar={() => setPickerKey(null)}
+                />
               )}
               <div className="empresa-linha"><span className="chave">Site</span>{e.site ? <a href={e.site} target="_blank" rel="noreferrer">{e.site}</a> : <span>—</span>}</div>
               <div className="empresa-linha"><span className="chave">Localização</span><span>{e.localizacao || '—'}</span></div>
@@ -732,6 +739,9 @@ export default function Empresas() {
                 <div className="chave">
                   Contatos encontrados: {e.total_prospects ?? 0}
                   {(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} de RH</span>}
+                </div>
+                <div className="cargos-alvo">
+                  {CARGOS_ALVO.map((c) => <span className="hashtag" key={c}>#{c.replace(/\s+/g, '')}</span>)}
                 </div>
                 {(e.emails_rh && e.emails_rh.length > 0) ? (
                   <>
@@ -761,7 +771,7 @@ export default function Empresas() {
           ))}
         </div>
       ) : (
-        <div className="preview-wrap">
+        <div className="preview-wrap tabela-full">
           <table className="grade">
             <thead>
               <tr>
