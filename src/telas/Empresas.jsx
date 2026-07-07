@@ -681,7 +681,15 @@ export default function Empresas() {
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
-        <button className="btn-refresh" disabled={visiveis.length === 0} onClick={exportarExcel} title="Baixar CSV (abre no Excel)">⬇ Exportar Excel</button>
+        <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Baixar CSV (abre no Excel)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" fill="#fff" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="M13 2v7h7" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
+            <rect x="7" y="12" width="10" height="7" rx="1" fill="#1D6F42"/>
+            <path d="M9.4 13.7l3.2 3.6M12.6 13.7l-3.2 3.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round"/>
+          </svg>
+          Exportar Excel
+        </button>
         <div className="view-toggle">
           <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Cartões</button>
           <button className={view === 'tabela' ? 'ativo' : ''} onClick={() => setView('tabela')}>Tabela</button>
