@@ -786,7 +786,7 @@ export default function Empresas() {
                 {(e.rh_contatos && e.rh_contatos.length > 0) ? (
                   <div className="rh-lista">
                     {e.rh_contatos.map((c) => (
-                      <div className="rh-linha" key={c.id}>
+                      <div className={'rh-linha' + (c.eh_rh ? ' rh-alvo' : '')} key={c.id}>
                         <span className="rh-info">
                           <span className="rh-nome">
                             {c.nome || '—'}
