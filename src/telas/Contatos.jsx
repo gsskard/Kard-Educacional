@@ -209,7 +209,7 @@ export default function Contatos() {
         <table className="preview">
           <thead>
             <tr>
-              <th></th><th>Nome</th><th>Cargo</th><th>Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
+              <th></th><th>Nome</th><th>Cargo</th><th className="col-cen">Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
               <th>Enriquecimento</th><th></th>
             </tr>
           </thead>
@@ -221,11 +221,8 @@ export default function Contatos() {
                   <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
                   <td>{r.nome || '—'}</td>
                   <td>{r.cargo || '—'}</td>
-                  <td>
-                    <span className="empresa-cel">
-                      <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
-                      {r.empresa || '—'}
-                    </span>
+                  <td className="col-cen" title={r.empresa || ''}>
+                    <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={28} />
                   </td>
                   <td>{r.cnpj || '—'}</td>
                   <td>{r.dominio || '—'}</td>
