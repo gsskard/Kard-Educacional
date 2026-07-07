@@ -55,6 +55,27 @@ export default function Contatos() {
     )
   }, [rows, busca])
 
+  // Exporta os contatos visíveis em CSV que o Excel abre (BOM UTF-8 + ; separador).
+  function exportarExcel() {
+    const cols = ['Nome', 'Cargo', 'Empresa', 'CNPJ', 'Domínio', 'E-mail', 'Status', 'Validado']
+    const esc = (v) => {
+      const s = String(v ?? '').replace(/"/g, '""')
+      return /[";\n]/.test(s) ? `"${s}"` : s
+    }
+    const simNao = (v) => (v === true || String(v).toLowerCase() === 'true' ? 'Sim' : 'Não')
+    const linhas = visiveis.map((r) => [
+      r.nome, r.cargo, r.empresa, r.cnpj, r.dominio, r.email, r.email_status, simNao(r.validado),
+    ])
+    const csv = [cols, ...linhas].map((l) => l.map(esc).join(';')).join('\r\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contatos-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function alternar(id) {
     setSelecionados((prev) => {
       const s = new Set(prev)
@@ -90,6 +111,14 @@ export default function Contatos() {
       <div className="toolbar">
         <input placeholder="Buscar nome, empresa ou e-mail..." value={busca} onChange={(e) => setBusca(e.target.value)} />
         <button className="btn-refresh" onClick={carregar}>Atualizar</button>
+        <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Exportar Excel" aria-label="Exportar Excel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" fill="#fff" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="M13 2v7h7" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
+            <rect x="7" y="12" width="10" height="7" rx="1" fill="#1D6F42"/>
+            <path d="M9.4 13.7l3.2 3.6M12.6 13.7l-3.2 3.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round"/>
+          </svg>
+        </button>
         <button
           className="btn-primario"
           disabled={selecionados.size === 0}
