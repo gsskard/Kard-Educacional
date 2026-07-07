@@ -90,6 +90,11 @@ h1, h2 { color: var(--navy); }
   font: inherit; color: var(--navy); text-align: left; }
 .empresa-link:hover { color: var(--verde-600); text-decoration: underline; }
 
+/* linha de empresa clicável (tabela "Por empresa") */
+.grade tr.linha-clicavel { cursor: pointer; }
+.grade tr.linha-clicavel:hover td { background: #f0fdf4; }
+.grade .col-cen { text-align: center; }
+
 /* ===== Painel lateral da empresa (gaveta estilo HubSpot) ===== */
 .painel-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .4); }
 .painel-empresa {
