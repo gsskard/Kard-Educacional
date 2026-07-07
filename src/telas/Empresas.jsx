@@ -579,6 +579,38 @@ export default function Empresas() {
     )
   }, [rows, busca])
 
+  // Exporta a tabela (uma linha por contato de RH) em CSV que o Excel abre.
+  // BOM UTF-8 pros acentos e ; como separador (padrão do Excel pt-BR).
+  function exportarExcel() {
+    const cols = ['Empresa', 'CNPJ', 'Localização', 'Porte', 'Capital social', 'Categoria', 'Domínio', 'Nome', 'Cargo', 'E-mail', 'Validade', 'Enriquecido em']
+    const esc = (v) => {
+      const s = String(v ?? '').replace(/"/g, '""')
+      return /[";\n]/.test(s) ? `"${s}"` : s
+    }
+    const validadeTxt = (em) => (em.valido === true ? 'Válido' : em.valido === false ? 'Inválido' : '—')
+    const linhas = []
+    for (const e of visiveis) {
+      const base = [e.empresa, e.cnpj, e.localizacao, e.porte, e.capital_social, e.categoria, e.dominio]
+      const emails = e.emails_rh || []
+      if (emails.length === 0) {
+        linhas.push([...base, '', '', '', '', e.enriquecido_em])
+      } else {
+        for (const em of emails) {
+          linhas.push([...base, em.nome, em.cargo, em.email, validadeTxt(em), e.enriquecido_em])
+        }
+      }
+    }
+    const csv = [cols, ...linhas].map((l) => l.map(esc).join(';')).join('\r\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const hoje = new Date().toISOString().slice(0, 10)
+    a.href = url
+    a.download = `empresas-rh-${hoje}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Enriquece TODAS as empresas. Sem forçar: as que já estão no cache Redis
   // não gastam crédito; as que faltam (ex.: sem localização) vão ao Hunter.
   async function enriquecerTudo() {
@@ -649,6 +681,7 @@ export default function Empresas() {
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
+        <button className="btn-refresh" disabled={visiveis.length === 0} onClick={exportarExcel} title="Baixar CSV (abre no Excel)">⬇ Exportar Excel</button>
         <div className="view-toggle">
           <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Cartões</button>
           <button className={view === 'tabela' ? 'ativo' : ''} onClick={() => setView('tabela')}>Tabela</button>
@@ -725,6 +758,7 @@ export default function Empresas() {
                 <th>Cargo</th>
                 <th>E-mail</th>
                 <th className="col-cen">Validade</th>
+                <th>Enriquecido em</th>
               </tr>
             </thead>
             <tbody>
@@ -746,6 +780,7 @@ export default function Empresas() {
                       {cabec()}
                       <td colSpan={3} className="cel-vazia">nenhum RH liberado ainda</td>
                       <td className="col-cen">—</td>
+                      <td>{e.enriquecido_em || '—'}</td>
                     </tr>
                   )]
                 }
@@ -758,6 +793,7 @@ export default function Empresas() {
                     <td>{em.cargo || '—'}</td>
                     <td className="cel-email">{em.email || '—'}</td>
                     <td className="col-cen"><PillEmail valido={em.valido} /></td>
+                    <td>{j === 0 ? (e.enriquecido_em || '—') : ''}</td>
                   </tr>
                 ))
               })}
