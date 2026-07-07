@@ -643,6 +643,7 @@ export default function Empresas() {
   const [emLote, setEmLote] = useState(false)
   const [pickerKey, setPickerKey] = useState(null)  // card com o seletor de domínio aberto
   const [revelando, setRevelando] = useState(new Set()) // ids de RH sendo desbloqueados
+  const [mostrarSemEmail, setMostrarSemEmail] = useState(false) // na Tabela: exibir contatos sem e-mail liberado
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -672,16 +673,24 @@ export default function Empresas() {
       const s = String(v ?? '').replace(/"/g, '""')
       return /[";\n]/.test(s) ? `"${s}"` : s
     }
-    const validadeTxt = (em) => (em.valido === true ? 'Válido' : em.valido === false ? 'Inválido' : '—')
+    const validadeTxt = (v) => {
+      const s = String(v).toLowerCase()
+      if (v === true || s === 'valido' || s === 'valid') return 'Válido'
+      if (v === false || s === 'invalido' || s === 'invalid') return 'Inválido'
+      return '—'
+    }
     const linhas = []
     for (const e of visiveis) {
       const base = [e.empresa, e.cnpj, e.localizacao, e.porte, e.capital_social, e.categoria, e.dominio]
-      const emails = e.emails_rh || []
-      if (emails.length === 0) {
+      // exporta os dados salvos no banco (todos os contatos); respeita o toggle
+      // "Mostrar sem e-mail" (senão, só os que já têm e-mail liberado).
+      const todos = e.rh_contatos || []
+      const contatos = mostrarSemEmail ? todos : todos.filter((c) => c.email)
+      if (contatos.length === 0) {
         linhas.push([...base, '', '', '', '', e.enriquecido_em])
       } else {
-        for (const em of emails) {
-          linhas.push([...base, em.nome, em.cargo, em.email, validadeTxt(em), e.enriquecido_em])
+        for (const c of contatos) {
+          linhas.push([...base, c.nome, c.cargo, c.email || '', validadeTxt(c.valido), e.enriquecido_em])
         }
       }
     }
@@ -790,6 +799,12 @@ export default function Empresas() {
             <path d="M9.4 13.7l3.2 3.6M12.6 13.7l-3.2 3.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round"/>
           </svg>
         </button>
+        {view === 'tabela' && (
+          <button className={mostrarSemEmail ? 'btn-primario' : 'btn-refresh'} onClick={() => setMostrarSemEmail((v) => !v)}
+            title="Exibir também os contatos que ainda não têm e-mail desbloqueado">
+            {mostrarSemEmail ? 'Ocultar sem e-mail' : 'Mostrar sem e-mail'}
+          </button>
+        )}
         <div className="view-toggle">
           <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Cartões</button>
           <button className={view === 'tabela' ? 'ativo' : ''} onClick={() => setView('tabela')}>Tabela</button>
@@ -915,7 +930,10 @@ export default function Empresas() {
             </thead>
             <tbody>
               {visiveis.flatMap((e, i) => {
-                const emails = e.emails_rh || []
+                // dados salvos no banco (rh_contatos): todos os contatos, com ou sem
+                // e-mail liberado. Sem o toggle, mostra só os que já têm e-mail.
+                const todos = e.rh_contatos || []
+                const contatos = mostrarSemEmail ? todos : todos.filter((c) => c.email)
                 const cnpj = e.cnpj || '—'
                 const cabec = () => (
                   <>
@@ -926,32 +944,49 @@ export default function Empresas() {
                     <td>{e.dominio || '—'}</td>
                   </>
                 )
-                if (emails.length === 0) {
+                if (contatos.length === 0) {
+                  const semTexto = todos.length > 0
+                    ? 'contatos sem e-mail liberado — clique em “Mostrar sem e-mail”'
+                    : 'nenhum contato salvo ainda'
                   return [(
                     <tr key={cnpj + '-vazia'} className="grupo-inicio">
                       {cabec()}
-                      <td colSpan={3} className="cel-vazia">nenhum RH liberado ainda</td>
+                      <td colSpan={3} className="cel-vazia">{semTexto}</td>
                       <td className="col-cen">—</td>
                       <td>{e.enriquecido_em || '—'}</td>
                     </tr>
                   )]
                 }
-                return emails.map((em, j) => (
-                  <tr key={cnpj + '-' + j} className={j === 0 ? 'grupo-inicio' : 'grupo-cont'}>
+                return contatos.map((c, j) => (
+                  <tr key={cnpj + '-' + (c.id ?? j)} className={j === 0 ? 'grupo-inicio' : 'grupo-cont'}>
                     {j === 0
                       ? cabec()
                       : <><td className="col-emp"></td><td></td><td></td><td></td><td></td></>}
-                    <td>{em.nome || '—'}</td>
-                    <td>{em.cargo || '—'}</td>
-                    <td className="cel-email">{em.email || '—'}</td>
-                    <td className="col-cen"><PillEmail valido={em.valido} /></td>
+                    <td>{c.nome || '—'}{c.eh_rh && <span className="tag-rh-mini">RH</span>}</td>
+                    <td>{c.cargo || '—'}</td>
+                    <td className="cel-email">
+                      {c.email
+                        ? c.email
+                        : <button className="btn-olho" title="Desbloquear e-mail (1 crédito Snov)" disabled={revelando.has(c.id)} onClick={() => desbloquear(e, c)}>
+                            {revelando.has(c.id) ? '…' : (
+                              <>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                                </svg>
+                                desbloquear
+                              </>
+                            )}
+                          </button>}
+                    </td>
+                    <td className="col-cen">{c.email ? <PillEmail valido={c.valido} /> : <span className="ajuda">—</span>}</td>
                     <td>{j === 0 ? (e.enriquecido_em || '—') : ''}</td>
                   </tr>
                 ))
               })}
             </tbody>
           </table>
-          <small className="ajuda">Uma linha por contato de RH liberado. Use os cartões para liberar novos e-mails.</small>
+          <small className="ajuda">Uma linha por contato salvo no banco. Clique em <b>“Mostrar sem e-mail”</b> pra ver quem ainda não foi desbloqueado e liberar direto aqui (👁).</small>
         </div>
       )}
       </>
