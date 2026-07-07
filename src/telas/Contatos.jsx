@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarContatos, listarEmpresas, enriquecerEmpresa, importarContatos } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
+import PainelEmpresa from '../componentes/PainelEmpresa'
 
 // Lê uma planilha CSV de contatos e devolve [{nome,cargo,empresa,cnpj,dominio,email}].
 // Aceita cabeçalho (em qualquer ordem) ou, sem cabeçalho, tenta adivinhar as colunas.
@@ -66,6 +67,7 @@ export default function Contatos() {
   const [selecionados, setSelecionados] = useState(() => new Set())
   const [msg, setMsg] = useState('')
   const [importando, setImportando] = useState(false)
+  const [empresaAberta, setEmpresaAberta] = useState(null) // nome da empresa com o painel aberto
   const inputArquivo = useRef(null)
 
   async function carregar() {
@@ -220,10 +222,12 @@ export default function Contatos() {
                   <td>{r.nome || '—'}</td>
                   <td>{r.cargo || '—'}</td>
                   <td>
-                    <span className="empresa-cel">
-                      <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
-                      {r.empresa || '—'}
-                    </span>
+                    {r.empresa
+                      ? <button type="button" className="empresa-cel empresa-link" onClick={() => setEmpresaAberta(r.empresa)} title="Ver empresa">
+                          <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
+                          {r.empresa}
+                        </button>
+                      : <span className="empresa-cel">—</span>}
                   </td>
                   <td>{r.cnpj || '—'}</td>
                   <td>{r.dominio || '—'}</td>
@@ -241,6 +245,15 @@ export default function Contatos() {
           </tbody>
         </table>
       )}
+
+      {empresaAberta && (() => {
+        const k = chave(empresaAberta)
+        const contatosDaEmpresa = rows.filter((r) => chave(r.empresa) === k)
+        const base = contatosDaEmpresa[0] || {}
+        // usa a empresa enriquecida (logo, site, porte...) se existir; senão, o que veio do contato
+        const emp = empresaPorNome.get(k) || { empresa: empresaAberta, cnpj: base.cnpj, dominio: base.dominio }
+        return <PainelEmpresa empresa={emp} contatos={contatosDaEmpresa} aoFechar={() => setEmpresaAberta(null)} />
+      })()}
     </div>
   )
 }

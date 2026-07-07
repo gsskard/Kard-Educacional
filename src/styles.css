@@ -85,6 +85,49 @@ h1, h2 { color: var(--navy); }
 /* páginas com tabela larga usam todo o espaço disponível */
 .conteudo:has(.tabela-full) { max-width: none; }
 
+/* ===== Empresa clicável na tabela de Contatos ===== */
+.empresa-link { background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; color: var(--navy); text-align: left; }
+.empresa-link:hover { color: var(--verde-600); text-decoration: underline; }
+
+/* ===== Painel lateral da empresa (gaveta estilo HubSpot) ===== */
+.painel-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .4); }
+.painel-empresa {
+  position: fixed; top: 0; right: 0; z-index: 61;
+  width: 420px; max-width: 92vw; height: 100vh; overflow-y: auto;
+  background: var(--card); border-left: 1px solid var(--borda);
+  box-shadow: -8px 0 40px rgba(15, 23, 42, .18);
+  display: flex; flex-direction: column;
+  animation: painelEntra .2s ease both;
+}
+@keyframes painelEntra { from { transform: translateX(24px); opacity: .4 } to { transform: none; opacity: 1 } }
+.painel-topo { display: flex; align-items: center; gap: 12px; padding: 18px 18px 16px;
+  border-bottom: 1px solid var(--borda); position: sticky; top: 0; background: var(--card); z-index: 1; }
+.painel-titulo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.painel-titulo strong { color: var(--navy); font-size: 16px; line-height: 1.25; }
+.painel-titulo small { color: var(--muted); font-size: 12px; }
+.painel-fechar { background: transparent; border: 1px solid var(--borda); color: var(--muted);
+  width: 30px; height: 30px; border-radius: 8px; cursor: pointer; flex: none; }
+.painel-fechar:hover { background: #f1f4f9; color: var(--navy); }
+.painel-corpo { padding: 16px 18px; display: flex; flex-direction: column; gap: 18px; }
+.painel-bloco { display: flex; flex-direction: column; }
+.painel-linha { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0;
+  border-bottom: 1px dashed var(--borda); font-size: 14px; }
+.painel-linha .chave { color: var(--muted); flex: none; }
+.painel-linha > span:last-child, .painel-linha a { color: var(--navy); text-align: right; word-break: break-word; }
+.painel-linha a { color: var(--verde-600); }
+.painel-secao-tit { display: flex; align-items: baseline; gap: 8px; font-weight: 700; color: var(--navy);
+  font-size: 14px; margin-bottom: 8px; }
+.painel-secao-tit small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.painel-contato { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--borda); }
+.painel-contato.eh-rh { background: #f0fdf4; border-radius: 8px; padding: 10px; margin: 2px 0; border-bottom: none; }
+.painel-contato-info { display: flex; flex-direction: column; min-width: 0; }
+.painel-contato-info strong { color: var(--navy); font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.painel-contato-info small { color: var(--muted); font-size: 12px; }
+.painel-contato-email { text-align: right; font-size: 13px; word-break: break-all; }
+.painel-contato-email a { color: var(--verde-600); }
+
 /* ===== Cabeçalho de página ===== */
 .pagina-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .pagina-head h1 { font-size: 24px; margin: 0; font-weight: 700; }
