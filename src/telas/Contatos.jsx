@@ -217,17 +217,15 @@ export default function Contatos() {
             {visiveis.map((r, i) => {
               const emp = empresaPorNome.get(chave(r.empresa))
               return (
-                <tr key={r.id ?? i}>
-                  <td><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
+                <tr key={r.id ?? i} className={r.empresa ? 'linha-clicavel' : ''} onClick={r.empresa ? () => setEmpresaAberta(r.empresa) : undefined} title={r.empresa ? 'Ver empresa' : undefined}>
+                  <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
                   <td>{r.nome || '—'}</td>
                   <td>{r.cargo || '—'}</td>
                   <td>
-                    {r.empresa
-                      ? <button type="button" className="empresa-cel empresa-link" onClick={() => setEmpresaAberta(r.empresa)} title="Ver empresa">
-                          <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
-                          {r.empresa}
-                        </button>
-                      : <span className="empresa-cel">—</span>}
+                    <span className="empresa-cel">
+                      <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={24} />
+                      {r.empresa || '—'}
+                    </span>
                   </td>
                   <td>{r.cnpj || '—'}</td>
                   <td>{r.dominio || '—'}</td>
@@ -237,7 +235,7 @@ export default function Contatos() {
                       ? <span className="pill pill-ok">enriquecida{emp.enriquecido_em ? ' ' + emp.enriquecido_em : ''}</span>
                       : <span className="ajuda">não</span>}
                   </td>
-                  <td><button className="btn-mini" onClick={() => enriquecerEmpresasDe([r])}>enriquecer</button></td>
+                  <td onClick={(ev) => ev.stopPropagation()}><button className="btn-mini" onClick={() => enriquecerEmpresasDe([r])}>enriquecer</button></td>
                 </tr>
               )
             })}
@@ -248,11 +246,16 @@ export default function Contatos() {
 
       {empresaAberta && (() => {
         const k = chave(empresaAberta)
-        const contatosDaEmpresa = rows.filter((r) => chave(r.empresa) === k)
-        const base = contatosDaEmpresa[0] || {}
-        // usa a empresa enriquecida (logo, site, porte...) se existir; senão, o que veio do contato
-        const emp = empresaPorNome.get(k) || { empresa: empresaAberta, cnpj: base.cnpj, dominio: base.dominio }
-        return <PainelEmpresa empresa={emp} contatos={contatosDaEmpresa} aoFechar={() => setEmpresaAberta(null)} />
+        const daEmpresa = rows.filter((r) => chave(r.empresa) === k)
+        const base = daEmpresa[0] || {}
+        // contatos no formato que o painel espera (valido vem do email_status)
+        const derivados = daEmpresa.map((r) => ({ id: r.id, nome: r.nome, cargo: r.cargo, email: r.email, valido: r.email_status, eh_rh: r.eh_rh }))
+        // usa a empresa enriquecida (logo, site, porte...) se existir; senão, monta pelo contato
+        const emp = empresaPorNome.get(k)
+        const empresaObj = emp
+          ? { ...emp, rh_contatos: (emp.rh_contatos && emp.rh_contatos.length) ? emp.rh_contatos : derivados }
+          : { empresa: empresaAberta, cnpj: base.cnpj, dominio: base.dominio, rh_contatos: derivados, total_prospects: derivados.length, total_rh: derivados.filter((c) => c.eh_rh).length }
+        return <PainelEmpresa empresa={empresaObj} aoFechar={() => setEmpresaAberta(null)} aoAtualizar={carregar} />
       })()}
     </div>
   )

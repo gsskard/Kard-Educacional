@@ -81,7 +81,7 @@ h1, h2 { color: var(--navy); }
 .usuario { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--navy); }
 .usuario-icone { font-size: 16px; }
 
-.conteudo { padding: 28px; width: 100%; max-width: 1180px; }
+.conteudo { padding: 28px; width: 100%; max-width: 1180px; margin: 0 auto; }
 /* páginas com tabela larga usam todo o espaço disponível */
 .conteudo:has(.tabela-full) { max-width: none; }
 
@@ -90,10 +90,10 @@ h1, h2 { color: var(--navy); }
   font: inherit; color: var(--navy); text-align: left; }
 .empresa-link:hover { color: var(--verde-600); text-decoration: underline; }
 
-/* linha de empresa clicável (tabela "Por empresa") */
-.grade tr.linha-clicavel { cursor: pointer; }
-.grade tr.linha-clicavel:hover td { background: #f0fdf4; }
-.grade .col-cen { text-align: center; }
+/* linha clicável (tabelas "Por empresa" e Contatos) */
+.preview tr.linha-clicavel, .grade tr.linha-clicavel { cursor: pointer; }
+.preview tr.linha-clicavel:hover td, .grade tr.linha-clicavel:hover td { background: #f0fdf4; }
+.preview .col-cen, .grade .col-cen { text-align: center; }
 
 /* ===== Painel lateral da empresa (gaveta estilo HubSpot) ===== */
 .painel-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .4); }
