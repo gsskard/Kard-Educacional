@@ -3,6 +3,7 @@ import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLot
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
 import { nomeProprio, formatarCnpj } from '../lib/formato'
+import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote } from '../lib/loteJob'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
@@ -135,8 +136,8 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
   const [entrada, setEntrada] = useState([])       // [{empresa, cnpj, dominio}] lido do CSV/texto
   const [arquivo, setArquivo] = useState('')
   const [texto, setTexto] = useState('')
-  const [processando, setProcessando] = useState(false)
-  const [progresso, setProgresso] = useState(null) // { n, total, nome }
+  const [job, setJob] = useState(estadoLote())      // progresso do lote (global, sobrevive à troca de aba)
+  const concluiuRef = useRef(job.concluido)
   const [resultados, setResultados] = useState([]) // linhas da tabela validacoes (candidatos já parseado)
   const [lote, setLote] = useState(null)           // { loteId, total }
   const [msg, setMsg] = useState('')
@@ -341,6 +342,21 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [])
 
+  // Assina o job global: o progresso aparece mesmo se a tela foi remontada.
+  useEffect(() => assinarLote(setJob), [])
+
+  // Quando o lote termina, atualiza a lista e leva pra aba Empresas — uma vez só.
+  useEffect(() => {
+    if (job.concluido && !concluiuRef.current) {
+      concluiuRef.current = true
+      onEnriquecido && onEnriquecido()
+      irParaEmpresas && irParaEmpresas()
+      limparConcluidoLote()
+    }
+    if (!job.concluido) concluiuRef.current = false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.concluido])
+
   function carregarArquivo(ev) {
     const f = ev.target.files && ev.target.files[0]
     if (!f) return
@@ -375,32 +391,11 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
   // quando não veio na planilha, e lista o RH — salvando no rh_enriquecimento.
   // Empresas COM domínio na planilha pulam a Receita (vão direto na Snov, rápido).
   // Sem domínio, respeitamos ~3/min da Receita entre as chamadas.
-  async function validar() {
-    if (!entrada.length || processando) return
-    setMsg(''); setProcessando(true)
-    const total = entrada.length
-    let ok = 0
-    let falhou = 0
-    for (let i = 0; i < entrada.length; i++) {
-      const r = entrada[i]
-      setProgresso({ n: i + 1, total, nome: r.empresa })
-      try {
-        await enriquecerEmpresa(r.empresa, r.cnpj, false, r.dominio)
-        ok++
-        onEnriquecido && onEnriquecido() // vai populando a aba Empresas em tempo real
-      } catch {
-        falhou++
-      }
-      // sem domínio = descoberta pela Receita (limite ~3/min) → espaça as chamadas
-      if (!r.dominio && i < entrada.length - 1) {
-        await new Promise((res) => setTimeout(res, 21000))
-      }
-    }
-    setProgresso(null)
-    setProcessando(false)
-    setMsg(`Concluído: ${ok} empresa(s) enriquecida(s)${falhou ? `, ${falhou} com falha` : ''}. Veja em "Empresas enriquecidas".`)
-    onEnriquecido && onEnriquecido()
-    irParaEmpresas && irParaEmpresas()
+  function validar() {
+    if (!entrada.length || job.rodando) return
+    setMsg('')
+    // dispara o job global; ele continua rodando mesmo se você trocar de aba/tela.
+    iniciarLoteJob(entrada, enriquecerEmpresa, onEnriquecido)
   }
 
   function novoLote() {
@@ -471,19 +466,17 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
 
       {msg && <div className="banner">{msg}</div>}
 
-      {processando ? (
+      {job.rodando ? (
         <div className="lote-progresso">
           <div className="lote-prog-topo">
             <strong>Descobrindo domínio &amp; listando RH…</strong>
-            {progresso && <span className="lote-prog-n">{progresso.n}/{progresso.total}</span>}
+            <span className="lote-prog-n">{job.n}/{job.total}</span>
           </div>
-          <div className="barra"><div className="barra-fill" style={{ width: progresso ? `${Math.round((progresso.n / progresso.total) * 100)}%` : '0%' }} /></div>
-          {progresso && (
-            <div className="ajuda">
-              processando: <b>{progresso.nome}</b>
-              {entrada.some((r) => !r.dominio) && ' — empresas sem domínio respeitam o limite da Receita (~3/min), pode demorar'}
-            </div>
-          )}
+          <div className="barra"><div className="barra-fill" style={{ width: job.total ? `${Math.round((job.n / job.total) * 100)}%` : '0%' }} /></div>
+          <div className="ajuda">
+            processando: <b>{nomeProprio(job.nome)}</b>
+            {' '}· pode <b>trocar de aba/tela</b> à vontade que ele continua rodando aqui.
+          </div>
         </div>
       ) : (
         <div className="lote-card">
