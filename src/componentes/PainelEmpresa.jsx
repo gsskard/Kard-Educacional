@@ -11,7 +11,8 @@ import { nomeProprio, formatarCnpj } from '../lib/formato'
 //   aoFechar()   → fecha o painel
 //   aoAtualizar()→ recarrega a lista do pai após uma ação (revelar/trocar/reenriquecer)
 
-const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people']
+// Cargos-alvo padrão (definem quem é marcado como RH). Editáveis por empresa.
+const CARGOS_PADRAO = ['RH', 'Recursos Humanos', 'DP', 'Departamento Pessoal', 'Gente e Gestão', 'Financeiro', 'Jurídico', 'Contabilidade']
 
 // Selo de validade do e-mail
 function PillEmail({ valido }) {
@@ -72,12 +73,31 @@ function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
 }
 
 export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
+  // cargos-alvo salvos por empresa (chave = CNPJ; cai no nome se faltar)
+  const cargoKey = 'kard_cargos_' + (String(empresa?.cnpj || '').replace(/\D/g, '') || empresa?.empresa || 'geral')
   const [picker, setPicker] = useState(false)
   const [revelando, setRevelando] = useState(() => new Set())
   const [aviso, setAviso] = useState('')
+  const [tags, setTags] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem(cargoKey) || 'null'); if (Array.isArray(s) && s.length) return s } catch { /* ignora */ }
+    return CARGOS_PADRAO
+  })
+  const [novoCargo, setNovoCargo] = useState('')
 
   if (!empresa) return null
   const e = empresa
+
+  function salvarTags(novas) {
+    setTags(novas)
+    try { localStorage.setItem(cargoKey, JSON.stringify(novas)) } catch { /* ignora */ }
+  }
+  function addCargo() {
+    const t = novoCargo.trim()
+    if (!t) return
+    if (!tags.some((x) => x.toLowerCase() === t.toLowerCase())) salvarTags([...tags, t])
+    setNovoCargo('')
+  }
+  function removerCargo(t) { salvarTags(tags.filter((x) => x !== t)) }
   const contatos = e.rh_contatos || []
   const totalProspects = e.total_prospects ?? contatos.length
   const totalRh = e.total_rh ?? contatos.filter((c) => c.eh_rh).length
@@ -102,7 +122,7 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
     setPicker(false)
     try {
       setAviso(`Reenriquecendo pelo domínio ${dominio}…`)
-      await enriquecerEmpresa(e.empresa, e.cnpj, true, dominio)
+      await enriquecerEmpresa(e.empresa, e.cnpj, true, dominio, tags)
       setAviso('Domínio atualizado. Atualizando em instantes…')
       recarregar()
     } catch (err) {
@@ -113,7 +133,7 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
   async function reenriquecer() {
     try {
       setAviso(`Reenriquecendo "${e.empresa}"…`)
-      await enriquecerEmpresa(e.empresa, e.cnpj, true, e.dominio)
+      await enriquecerEmpresa(e.empresa, e.cnpj, true, e.dominio, tags)
       setAviso('Enriquecimento atualizado. Atualizando em instantes…')
       recarregar()
     } catch (err) {
@@ -166,8 +186,22 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
               {totalRh > 0 && <span className="tag-rh"> · {totalRh} de RH</span>}
             </div>
             <div className="cargos-alvo">
-              {CARGOS_ALVO.map((c) => <span className="hashtag" key={c}>#{c.replace(/\s+/g, '')}</span>)}
+              {tags.map((t) => (
+                <span className="hashtag" key={t}>
+                  {t}
+                  <button type="button" className="tag-x" title="remover cargo" onClick={() => removerCargo(t)}>×</button>
+                </span>
+              ))}
+              <input
+                className="cargo-add"
+                value={novoCargo}
+                onChange={(ev) => setNovoCargo(ev.target.value)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); addCargo() } }}
+                onBlur={addCargo}
+                placeholder="+ cargo"
+              />
             </div>
+            <small className="ajuda">Esses cargos definem quem é marcado como <b>RH</b>. Edite e clique em <b>reenriquecer</b> pra reclassificar (fica salvo por empresa).</small>
             {contatos.length > 0 ? (
               <div className="rh-lista">
                 {contatos.map((c, i) => (

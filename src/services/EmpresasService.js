@@ -19,12 +19,13 @@ export class EmpresasService {
   // POST /crm-cobranca/rh-preview — GRÁTIS (0 créditos Snov). Descobre o domínio
   // (BrasilAPI/Receita + contagem Snov) e salva os prospects sem e-mail.
   // forcar=true ignora o cache; dominio manda a busca por domínio (evita chute errado).
-  enriquecerEmpresa(empresa, cnpj, forcar, dominio) {
+  enriquecerEmpresa(empresa, cnpj, forcar, dominio, cargosAlvo) {
     return this.api.post('/crm-cobranca/rh-preview', {
       empresa,
       cnpj,
       forcar: forcar === true,
       dominio: dominio || undefined,
+      cargos_alvo: cargosAlvo && cargosAlvo.length ? cargosAlvo : undefined,
     })
   }
 

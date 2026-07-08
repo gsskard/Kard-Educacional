@@ -418,8 +418,12 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .dom-count { color: var(--muted); font-size: 12px; }
 
 /* hashtags dos cargos-alvo (filtro de RH) */
-.cargos-alvo { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 10px; }
-.hashtag { font-size: 11px; font-weight: 600; color: var(--verde-600); background: var(--verde-50); border: 1px solid var(--borda); border-radius: 999px; padding: 2px 9px; }
+.cargos-alvo { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 6px; align-items: center; }
+.hashtag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--verde-600); background: var(--verde-50); border: 1px solid var(--borda); border-radius: 999px; padding: 2px 9px; }
+.hashtag .tag-x { background: none; border: none; color: var(--verde-600); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; opacity: .6; }
+.hashtag .tag-x:hover { opacity: 1; }
+.cargo-add { width: 84px; font-size: 11px; padding: 3px 8px; border: 1px dashed var(--borda); border-radius: 999px; background: transparent; color: var(--navy); }
+.cargo-add:focus { outline: none; border-color: var(--verde-600); border-style: solid; width: 120px; }
 
 /* candidatos de domínio no painel "trocar" (IA/Snov + contagem) */
 .dom-cand { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 10px; margin: 4px 0; font-size: 13px; }
