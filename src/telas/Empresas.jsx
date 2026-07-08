@@ -131,10 +131,12 @@ function parseCSV(texto) {
   return out
 }
 
-function ValidacaoLote({ onEnriquecido }) {
-  const [entrada, setEntrada] = useState([])       // [{empresa, cnpj}] lido do CSV/texto
+function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
+  const [entrada, setEntrada] = useState([])       // [{empresa, cnpj, dominio}] lido do CSV/texto
   const [arquivo, setArquivo] = useState('')
   const [texto, setTexto] = useState('')
+  const [processando, setProcessando] = useState(false)
+  const [progresso, setProgresso] = useState(null) // { n, total, nome }
   const [resultados, setResultados] = useState([]) // linhas da tabela validacoes (candidatos já parseado)
   const [lote, setLote] = useState(null)           // { loteId, total }
   const [msg, setMsg] = useState('')
@@ -333,19 +335,10 @@ function ValidacaoLote({ onEnriquecido }) {
     candidatos: r.dominio ? [{ domain: r.dominio, total: null, oficial: true }] : [],
   }))
 
-  // Retoma o último lote ao abrir a aba — permite fechar a tela e voltar depois.
+  // Limpa qualquer resquício de lote antigo (o fluxo agora enriquece na hora via rh-preview).
   useEffect(() => {
-    let salvo = null
-    try { salvo = JSON.parse(localStorage.getItem('kard_lote') || 'null') } catch { salvo = null }
-    if (salvo && salvo.loteId) {
-      setLote(salvo)
-      // lote local (importado com domínio) não tem processamento no servidor:
-      // reconstrói a planilha a partir dos registros salvos, sem polling.
-      if (salvo.local && Array.isArray(salvo.registros)) setResultados(semear(salvo.registros))
-      else acompanhar(salvo.loteId, salvo.total)
-    }
+    try { localStorage.removeItem('kard_lote') } catch { /* ignora */ }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function carregarArquivo(ev) {
@@ -378,40 +371,36 @@ function ValidacaoLote({ onEnriquecido }) {
 
   // Inicia o lote no servidor. Ele processa 1 empresa a cada ~20s (respeita a ReceitaWS 3/min);
   // a tela pode ser fechada — os resultados ficam salvos e reaparecem ao voltar.
+  // Enriquece cada empresa via rh-preview (GRÁTIS): descobre o domínio (Receita)
+  // quando não veio na planilha, e lista o RH — salvando no rh_enriquecimento.
+  // Empresas COM domínio na planilha pulam a Receita (vão direto na Snov, rápido).
+  // Sem domínio, respeitamos ~3/min da Receita entre as chamadas.
   async function validar() {
-    if (!entrada.length) return
-    const loteId = 'L' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-    setResultados([]); setMsg('')
-    try {
-      const r = await iniciarValidacaoLote(loteId, entrada)
-      const total = (r && r.total) || entrada.length
-      const eta = (r && r.eta_segundos) || total * 20
-      const info = { loteId, total }
-      setLote(info)
-      localStorage.setItem('kard_lote', JSON.stringify(info))
-      const min = Math.max(1, Math.round(eta / 60))
-      setMsg(`Processando ${total} empresa(s) no servidor (~${min} min, cerca de 3/min pela Receita). Você pode fechar esta tela e voltar mais tarde — os resultados vão aparecendo aqui.`)
-      if (timerRef.current) clearTimeout(timerRef.current)
-      acompanhar(loteId, total)
-    } catch (err) {
-      setMsg('⏳ ' + err.message)
+    if (!entrada.length || processando) return
+    setMsg(''); setProcessando(true)
+    const total = entrada.length
+    let ok = 0
+    let falhou = 0
+    for (let i = 0; i < entrada.length; i++) {
+      const r = entrada[i]
+      setProgresso({ n: i + 1, total, nome: r.empresa })
+      try {
+        await enriquecerEmpresa(r.empresa, r.cnpj, false, r.dominio)
+        ok++
+        onEnriquecido && onEnriquecido() // vai populando a aba Empresas em tempo real
+      } catch {
+        falhou++
+      }
+      // sem domínio = descoberta pela Receita (limite ~3/min) → espaça as chamadas
+      if (!r.dominio && i < entrada.length - 1) {
+        await new Promise((res) => setTimeout(res, 21000))
+      }
     }
-  }
-
-  // ATALHO (grátis, sem servidor): a planilha já tem o site/domínio → pulamos a
-  // descoberta pela Receita. Semeamos a planilha na hora; o "Listar RH de todas"
-  // chama o rh-preview já com o domínio (busca direto na Snov, sem espera 3/min).
-  function importarComDominio() {
-    if (!entrada.length) return
-    const comDom = entrada.filter((r) => r.dominio).length
-    const loteId = 'LOCAL-' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-    const info = { loteId, total: entrada.length, local: true, registros: entrada }
-    if (timerRef.current) clearTimeout(timerRef.current)
-    setResultados(semear(entrada))
-    setLote(info)
-    localStorage.setItem('kard_lote', JSON.stringify(info))
-    setMsg(`${entrada.length} empresa(s) importada(s) — ${comDom} já com domínio (descoberta pulada). ` +
-      `Clique em "Listar RH de todas (grátis)" para trazer os contatos. Só gasta crédito ao liberar/validar um e-mail.`)
+    setProgresso(null)
+    setProcessando(false)
+    setMsg(`Concluído: ${ok} empresa(s) enriquecida(s)${falhou ? `, ${falhou} com falha` : ''}. Veja em "Empresas enriquecidas".`)
+    onEnriquecido && onEnriquecido()
+    irParaEmpresas && irParaEmpresas()
   }
 
   function novoLote() {
@@ -473,60 +462,59 @@ function ValidacaoLote({ onEnriquecido }) {
 
   return (
     <div>
-      <p className="ajuda">
-        Suba um CSV com <b>nome da empresa</b> e <b>CNPJ</b> (colunas <code>empresa</code>, <code>cnpj</code>) e,
-        se tiver, <b>site/domínio</b> (coluna <code>site</code> ou <code>dominio</code>). Com o domínio na planilha,
-        clique em <b>“Importar”</b> — pulamos a descoberta pela Receita (sem espera de ~3/min). Sem domínio, use
-        <b> “Descobrir domínio”</b>: o servidor acha ~3/empresa por minuto e vai salvando (<b>pode fechar e voltar</b>).
-        Listar o RH é <b>grátis</b>; só gasta crédito Snov ao <b>liberar</b> ou <b>validar</b> um e-mail.
+      <p className="ajuda lote-intro">
+        Suba um CSV (ou cole abaixo) com <b>nome da empresa</b> e <b>CNPJ</b> — e, se tiver, o <b>site/domínio</b>.
+        Ao clicar em <b>Descobrir</b>, cada empresa é enriquecida: achamos o domínio pela Receita (quando não veio),
+        listamos o RH e salvamos — o resultado aparece em <b>Empresas enriquecidas</b>. Listar é <b>grátis</b>;
+        só gasta crédito Snov ao <b>liberar/validar</b> um e-mail.
       </p>
 
       {msg && <div className="banner">{msg}</div>}
 
-      {!lote ? (
-        <>
-          <div className="lote-entrada">
-            <label className="btn-secundario arquivo-label">
+      {processando ? (
+        <div className="lote-progresso">
+          <div className="lote-prog-topo">
+            <strong>Descobrindo domínio &amp; listando RH…</strong>
+            {progresso && <span className="lote-prog-n">{progresso.n}/{progresso.total}</span>}
+          </div>
+          <div className="barra"><div className="barra-fill" style={{ width: progresso ? `${Math.round((progresso.n / progresso.total) * 100)}%` : '0%' }} /></div>
+          {progresso && (
+            <div className="ajuda">
+              processando: <b>{progresso.nome}</b>
+              {entrada.some((r) => !r.dominio) && ' — empresas sem domínio respeitam o limite da Receita (~3/min), pode demorar'}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="lote-card">
+          <div className="lote-topo">
+            <label className="arquivo-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
               Escolher CSV
               <input type="file" accept=".csv,text/csv" onChange={carregarArquivo} hidden />
             </label>
             {arquivo && <span className="arquivo-nome">{arquivo}</span>}
-            <span className="ajuda">ou cole abaixo (uma empresa por linha):</span>
+            <span className="lote-ou">ou cole abaixo — uma empresa por linha</span>
           </div>
           <textarea
             className="lote-textarea"
             placeholder={'empresa;cnpj;site\nMagazine Luiza;47.960.950/0001-21;magazineluiza.com.br\nO Boticário;;boticario.com.br'}
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            rows={4}
+            onChange={(e) => { setTexto(e.target.value); setEntrada(parseCSV(e.target.value)) }}
+            rows={5}
           />
-          {entrada.length > 0 && (
-            <div className="ajuda lote-lida">
-              {entrada.length} empresa(s) lida(s){' '}
-              {entrada.filter((r) => r.dominio).length > 0 && <b>· {entrada.filter((r) => r.dominio).length} com domínio</b>}
-            </div>
-          )}
-          <div className="toolbar">
-            <button className="btn-refresh" onClick={carregarTexto} disabled={!texto.trim()}>Ler texto colado</button>
-            {entrada.some((r) => r.dominio) && (
-              <button className="btn-primario" onClick={importarComDominio} title="A planilha já tem o domínio — pula a descoberta pela Receita">
-                {`Importar ${entrada.length} (já tem domínio)`}
-              </button>
-            )}
-            <button className={entrada.some((r) => r.dominio) ? 'btn-refresh' : 'btn-primario'} onClick={validar} disabled={!entrada.length} title="Descobre o domínio de cada empresa pela Receita (~3/min)">
-              {`Descobrir domínio de ${entrada.length || ''} empresa(s)`}
+          <div className="lote-rodape">
+            <span className="ajuda">
+              {entrada.length > 0
+                ? <><b>{entrada.length}</b> empresa(s) lida(s){entrada.filter((r) => r.dominio).length > 0 && <> · {entrada.filter((r) => r.dominio).length} já com domínio</>}</>
+                : 'nenhuma empresa lida ainda'}
+            </span>
+            <button className="btn-primario" onClick={validar} disabled={!entrada.length}>
+              {`Descobrir domínio & RH de ${entrada.length || ''} empresa(s)`}
             </button>
           </div>
-        </>
-      ) : (
-        <div className="toolbar">
-          <span className="ajuda">{lote.local ? <><b>{feitas}</b> empresa(s) importada(s).</> : <>Lote em andamento: <b>{feitas}/{total}</b> concluídas.</>}</span>
-          {feitas > 0 && <button className="btn-refresh" onClick={baixarCSV}>Baixar resultado (CSV)</button>}
-          <button className="btn-refresh" onClick={novoLote}>Novo lote</button>
         </div>
       )}
-
-      {lote && feitas < total && <div className="loading">Aguardando o servidor processar… ({feitas}/{total})</div>}
 
       {feitas > 0 && (
         <>
@@ -782,7 +770,7 @@ export default function Empresas() {
       </div>
 
       {aba === 'lote' ? (
-        <ValidacaoLote onEnriquecido={carregar} />
+        <ValidacaoLote onEnriquecido={carregar} irParaEmpresas={() => setAba('empresas')} />
       ) : (
       <>
       <p className="ajuda">Empresas enriquecidas via Snov.io: domínio, site, localização, porte, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
