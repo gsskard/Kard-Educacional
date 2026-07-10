@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
 import { nomeProprio, formatarCnpj } from '../lib/formato'
-import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote } from '../lib/loteJob'
+import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverPendente, descartarPendente } from '../lib/loteJob'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
@@ -60,6 +60,46 @@ function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
         <input placeholder="ex.: kard.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
         <button className="btn-mini" disabled={!manual.trim()} onClick={() => onEnriquecer(manual.trim())}>usar</button>
         <button className="btn-mini" onClick={onFechar}>fechar</button>
+      </div>
+    </div>
+  )
+}
+
+// Escolha de domínio de uma empresa INCERTA (fase de confirmação do lote).
+// Mostra os candidatos da descoberta (grátis) + a sugestão da IA em destaque.
+// Clicar em "usar" lista o RH daquele domínio (aí sim gasta crédito).
+function EscolhaDominio({ item, onUsar, onDescartar }) {
+  const [manual, setManual] = useState('')
+  const rec = (item.ia && item.ia.recomendado) || item.dominio_sugerido || ''
+  const cands = (item.candidatos || []).slice().sort((a, b) => (b.emails || 0) - (a.emails || 0))
+  return (
+    <div className="pendente-emp">
+      <div className="pendente-topo">
+        <CompanyLogo dominio={rec} nome={item.empresa} size={28} />
+        <div className="pendente-nome">
+          <strong>{nomeProprio(item.empresa)}</strong>
+          <small>{item.cnpj ? formatarCnpj(item.cnpj) : 'sem CNPJ'}</small>
+        </div>
+        <button className="btn-mini" onClick={onDescartar}>descartar</button>
+      </div>
+      {item.ia && item.ia.motivo && <div className="pendente-ia">🤖 IA: {item.ia.motivo}</div>}
+      <div className="ajuda">Escolha o domínio certo — só então listamos o RH (<b>gasta crédito</b>).</div>
+      <div className="dominio-picker">
+        {cands.length > 0 ? cands.map((c) => (
+          <div key={c.domain} className={'dom-cand' + (c.domain === rec ? ' recomendado' : '')}>
+            <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
+            <span className="dom-nome">
+              {c.domain}{c.oficial ? ' ★' : ''}
+              {c.domain === rec && <span className="dom-ia">IA sugere</span>}
+            </span>
+            <small>{c.emails ?? 0} e-mail(s)</small>
+            <button className="btn-mini" onClick={() => onUsar(c.domain)}>usar</button>
+          </div>
+        )) : <div className="ajuda">Sem candidatos — digite o domínio abaixo.</div>}
+        <div className="dom-manual">
+          <input placeholder="ex.: empresa.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
+          <button className="btn-mini" disabled={!manual.trim()} onClick={() => onUsar(manual.trim())}>usar</button>
+        </div>
       </div>
     </div>
   )
@@ -345,12 +385,20 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
   // Assina o job global: o progresso aparece mesmo se a tela foi remontada.
   useEffect(() => assinarLote(setJob), [])
 
-  // Quando o lote termina, atualiza a lista e leva pra aba Empresas — uma vez só.
+  // Fases do lote: descobrir (grátis) e listar (gasta crédito). Compartilhado
+  // pelo início do lote e pela resolução de cada empresa incerta (pendente).
+  const fnsLote = useMemo(() => ({
+    descobrir: descobrirEmpresa,
+    listar: (e, c, d) => enriquecerEmpresa(e, c, false, d),
+  }), [])
+
+  // Quando o lote termina, atualiza a lista. Só volta pra aba Empresas se NÃO
+  // sobrou nenhuma empresa aguardando escolha de domínio (senão fica aqui pra resolver).
   useEffect(() => {
     if (job.concluido && !concluiuRef.current) {
       concluiuRef.current = true
       onEnriquecido && onEnriquecido()
-      irParaEmpresas && irParaEmpresas()
+      if (!job.pendentes.length) irParaEmpresas && irParaEmpresas()
       limparConcluidoLote()
     }
     if (!job.concluido) concluiuRef.current = false
@@ -395,7 +443,8 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
     if (!entrada.length || job.rodando) return
     setMsg('')
     // dispara o job global; ele continua rodando mesmo se você trocar de aba/tela.
-    iniciarLoteJob(entrada, enriquecerEmpresa, onEnriquecido)
+    // Fase 1 descobre o domínio (grátis); confiança alta lista sozinho, baixa cai em "Confirmar domínio".
+    iniciarLoteJob(entrada, fnsLote, onEnriquecido)
   }
 
   function novoLote() {
@@ -459,9 +508,9 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
     <div>
       <p className="ajuda lote-intro">
         Suba um CSV (ou cole abaixo) com <b>nome da empresa</b> e <b>CNPJ</b> — e, se tiver, o <b>site/domínio</b>.
-        Ao clicar em <b>Descobrir</b>, cada empresa é enriquecida: achamos o domínio pela Receita (quando não veio),
-        listamos o RH e salvamos — o resultado aparece em <b>Empresas enriquecidas</b>. Listar é <b>grátis</b>;
-        só gasta crédito Snov ao <b>liberar/validar</b> um e-mail.
+        Ao clicar em <b>Descobrir</b>, achamos o domínio (<b>grátis</b>): se estiver claro, já listamos o RH;
+        se ficar <b>incerto</b>, mostramos os candidatos + sugestão da <b>IA</b> em <b>Confirmar domínio</b> pra você
+        escolher o certo — só então gasta crédito.
       </p>
 
       {msg && <div className="banner">{msg}</div>}
@@ -506,6 +555,24 @@ function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
               {`Descobrir domínio & RH de ${entrada.length || ''} empresa(s)`}
             </button>
           </div>
+        </div>
+      )}
+
+      {job.pendentes.length > 0 && (
+        <div className="confirmar-dominio">
+          <h3>Confirmar domínio ({job.pendentes.length})</h3>
+          <p className="ajuda">
+            Estas empresas ficaram <b>incertas</b> na descoberta (sem CNPJ ou sem domínio oficial claro).
+            Escolha o domínio correto pra listar o RH — só aí gasta crédito.
+          </p>
+          {job.pendentes.map((item, i) => (
+            <EscolhaDominio
+              key={(item.cnpj || item.empresa) + '-' + i}
+              item={item}
+              onUsar={(dom) => resolverPendente(item, dom, fnsLote, onEnriquecido)}
+              onDescartar={() => descartarPendente(item)}
+            />
+          ))}
         </div>
       )}
 

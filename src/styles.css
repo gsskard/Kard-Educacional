@@ -502,6 +502,21 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .dom-cand .dom-nome { flex: 1; min-width: 0; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dom-cand small { flex: none; white-space: nowrap; color: var(--muted); }
 .dom-cand .btn-mini { flex: none; }
+.dom-cand.recomendado { border-color: var(--verde); background: var(--verde-50); }
+.dom-ia { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 700; color: #fff;
+  background: var(--verde-600); border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
+
+/* Fase "Confirmar domínio" do lote (empresas incertas) */
+.confirmar-dominio { margin-top: 20px; padding: 16px 18px; border: 1px solid #fde68a;
+  background: #fffbeb; border-radius: 12px; }
+.confirmar-dominio > h3 { margin: 0 0 4px; font-size: 16px; color: var(--navy); }
+.pendente-emp { background: var(--card); border: 1px solid var(--borda); border-radius: 12px;
+  padding: 12px 14px; margin: 12px 0 0; }
+.pendente-topo { display: flex; align-items: center; gap: 10px; }
+.pendente-nome { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.pendente-nome strong { color: var(--navy); }
+.pendente-nome small { color: var(--muted); font-size: 12px; }
+.pendente-ia { margin: 8px 0 2px; font-size: 13px; color: var(--verde-600); }
 
 /* visão Tabela ocupando a largura da tela (quebra o max-width do conteúdo) */
 /* estoura o padding lateral do conteúdo (sem contas com viewport) */
