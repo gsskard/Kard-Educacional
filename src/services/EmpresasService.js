@@ -29,6 +29,19 @@ export class EmpresasService {
     })
   }
 
+  // POST /crm-cobranca/rh-preview com so_descobrir=true — GRÁTIS (0 crédito Snov).
+  // Fase 1: só descobre o domínio (Receita + contagem Snov) e devolve candidatos +
+  // confiança (alta/baixa) + recomendação da IA — NÃO lista o RH (não gasta crédito).
+  // Responde { cnpj, empresa, dominio_sugerido, confianca, dados, candidatos, ia }.
+  async descobrirEmpresa(empresa, cnpj, dominio) {
+    return this.api.post('/crm-cobranca/rh-preview', {
+      empresa,
+      cnpj,
+      dominio: dominio || undefined,
+      so_descobrir: true,
+    })
+  }
+
   // GET /crm-cobranca/dominios — GRÁTIS. Domínios candidatos + contagem (Hunter email-count).
   async sugerirDominios(nome) {
     try {

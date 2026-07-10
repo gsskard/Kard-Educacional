@@ -21,6 +21,8 @@ export const dispararEtapa = (etapa, modelo) => cobrancaService.dispararEtapa(et
 export const listarEmpresas = () => empresasService.listarEmpresas()
 export const enriquecerEmpresa = (empresa, cnpj, forcar, dominio, cargosAlvo) =>
   empresasService.enriquecerEmpresa(empresa, cnpj, forcar, dominio, cargosAlvo)
+export const descobrirEmpresa = (empresa, cnpj, dominio) =>
+  empresasService.descobrirEmpresa(empresa, cnpj, dominio)
 export const sugerirDominios = (nome) => empresasService.sugerirDominios(nome)
 export const validarDominio = (empresa, cnpj) => empresasService.validarDominio(empresa, cnpj)
 export const iniciarValidacaoLote = (loteId, registros) => empresasService.iniciarLote(loteId, registros)
