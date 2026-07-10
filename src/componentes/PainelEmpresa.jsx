@@ -83,6 +83,7 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
     return CARGOS_PADRAO
   })
   const [novoCargo, setNovoCargo] = useState('')
+  const [expandido, setExpandido] = useState(false)
 
   if (!empresa) return null
   const e = empresa
@@ -144,13 +145,23 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
   return (
     <>
       <div className="painel-backdrop" onClick={aoFechar} />
-      <aside className="painel-empresa" role="dialog" aria-label={'Empresa ' + (e.empresa || '')}>
+      <aside
+        className={'painel-empresa' + (expandido ? ' painel-expandido' : '')}
+        role="dialog"
+        aria-label={'Empresa ' + (e.empresa || '')}
+      >
         <header className="painel-topo">
           <CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={44} />
           <div className="painel-titulo">
             <strong>{nomeProprio(e.empresa) || '—'}</strong>
             {e.cnpj && <small>{formatarCnpj(e.cnpj)}</small>}
           </div>
+          <button
+            className="painel-fechar"
+            onClick={() => setExpandido((v) => !v)}
+            aria-label={expandido ? 'Recolher' : 'Expandir'}
+            title={expandido ? 'Recolher' : 'Expandir para página'}
+          >{expandido ? '⤡' : '⤢'}</button>
           <button className="painel-fechar" onClick={aoFechar} aria-label="Fechar">✕</button>
         </header>
 
