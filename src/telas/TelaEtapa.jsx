@@ -32,15 +32,25 @@ export default function TelaEtapa({ etapa }) {
   const [carga, setCarga] = useState(null)   // { cabecalho, registros }
   const [nomeArquivo, setNomeArquivo] = useState('')
   const [msg, setMsg] = useState('')
+  const [arrastando, setArrastando] = useState(false)
 
-  function aoEscolherArquivo(e) {
-    const arquivo = e.target.files?.[0]
+  function processarArquivo(arquivo) {
     if (!arquivo) return
     setNomeArquivo(arquivo.name)
     setMsg('')
     const leitor = new FileReader()
     leitor.onload = () => setCarga(parseCSV(String(leitor.result)))
     leitor.readAsText(arquivo, 'utf-8')
+  }
+
+  function aoEscolherArquivo(e) {
+    processarArquivo(e.target.files?.[0])
+  }
+
+  function aoSoltar(e) {
+    e.preventDefault()
+    setArrastando(false)
+    processarArquivo(e.dataTransfer.files?.[0])
   }
 
   // Conferência: quais colunas esperadas estão faltando / sobrando (RF-27)
@@ -81,8 +91,26 @@ export default function TelaEtapa({ etapa }) {
             ? 'Formato do Anexo A (Cobrança).'
             : 'Formato educacional.'}
         </p>
-        <input type="file" accept=".csv,text/csv" onChange={aoEscolherArquivo} />
-        {nomeArquivo && <span className="arquivo-nome">{nomeArquivo}</span>}
+        <label
+          className={'dropzone' + (arrastando ? ' arrastando' : '') + (nomeArquivo ? ' tem-arquivo' : '')}
+          onDragOver={(e) => { e.preventDefault(); setArrastando(true) }}
+          onDragLeave={() => setArrastando(false)}
+          onDrop={aoSoltar}
+        >
+          <input type="file" accept=".csv,text/csv" onChange={aoEscolherArquivo} hidden />
+          <div className="dropzone-icone">{nomeArquivo ? '📄' : '📤'}</div>
+          {nomeArquivo ? (
+            <>
+              <div className="dropzone-titulo">{nomeArquivo}</div>
+              <div className="dropzone-sub">Clique ou arraste outro arquivo para substituir</div>
+            </>
+          ) : (
+            <>
+              <div className="dropzone-titulo">Arraste o CSV aqui ou <span className="dropzone-link">escolha um arquivo</span></div>
+              <div className="dropzone-sub">Apenas .csv · formato {etapa.formato}</div>
+            </>
+          )}
+        </label>
       </section>
 
       {/* 2) CONFERÊNCIA ---------------------------------------------- */}

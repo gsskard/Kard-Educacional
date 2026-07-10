@@ -98,6 +98,23 @@ h1, h2 { color: var(--navy); }
   color: var(--navy); background: #f1f4f9; border: 1px solid var(--borda); border-radius: 9px; padding: 8px 14px; }
 .arquivo-label:hover { background: #e8edf5; }
 .arquivo-nome { font-size: 13px; color: var(--verde-600); font-weight: 600; }
+
+/* Dropzone de upload (etapas Educacional/Cobrança) */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; text-align: center; cursor: pointer;
+  padding: 26px 20px; border-radius: 14px;
+  border: 2px dashed #cdd6e4; background: #f8fafc;
+  transition: border-color .15s, background .15s, transform .05s;
+}
+.dropzone:hover { border-color: var(--verde); background: var(--verde-50); }
+.dropzone.arrastando { border-color: var(--verde-600); background: var(--verde-50); transform: scale(1.005); }
+.dropzone.tem-arquivo { border-style: solid; border-color: var(--verde); background: var(--verde-50); }
+.dropzone-icone { font-size: 30px; line-height: 1; }
+.dropzone-titulo { font-size: 14px; font-weight: 600; color: var(--navy); }
+.dropzone-link { color: var(--verde-600); text-decoration: underline; }
+.dropzone-sub { font-size: 12px; color: var(--muted); }
+
 .lote-ou { font-size: 13px; color: var(--muted); }
 .lote-textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--borda); border-radius: 10px;
   padding: 12px; font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; resize: vertical; background: #fbfcfe; }
