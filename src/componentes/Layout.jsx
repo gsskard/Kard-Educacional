@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { irPara } from '../hooks/useHashRoute'
+import { snovSaldo } from '../api/n8n'
 
 // Layout no estilo do "Portal Super Crédito" da Kard:
 // sidebar branca com logo + menu (chevron), topo com breadcrumb e usuário.

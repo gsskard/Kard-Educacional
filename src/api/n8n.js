@@ -30,6 +30,7 @@ export const lerValidacoes = (loteId) => empresasService.lerLote(loteId)
 export const rhPreview = (empresa, cnpj, dominio, cargosAlvo) => rhService.preview(empresa, cnpj, dominio, cargosAlvo)
 export const rhRevelar = (cnpj, hashes, modo, n) => rhService.revelar(cnpj, hashes, modo, n)
 export const rhValidar = (hashes) => rhService.validar(hashes)
+export const snovSaldo = () => rhService.saldo()
 
 // RF-39/40: eventos de e-mail — endpoint ainda não existe no n8n.
 export function listarEventos() {

@@ -56,6 +56,13 @@ export class RhService {
     })
     return extrairLista(data).map(ProspectRH.fromJson)
   }
+
+  // GET /crm-cobranca/snov-saldo — GRÁTIS. Saldo de créditos da conta Snov.
+  // Responde { creditos, atualizado_em }.
+  async saldo() {
+    const data = await this.api.get('/crm-cobranca/snov-saldo')
+    return { creditos: data?.creditos ?? null, atualizadoEm: data?.atualizado_em || null }
+  }
 }
 
 export const rhService = new RhService()
