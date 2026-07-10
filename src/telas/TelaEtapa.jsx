@@ -6,9 +6,8 @@ import PillStatus from '../componentes/PillStatus'
 // Recebe a config da etapa e monta as 5 seções da Fase 1 (Claude2.md seção 8):
 //   1) Upload do arquivo   (RF-26)
 //   2) Conferência da carga (RF-27/28)
-//   3) Remetente/inbox     (RF-22/23)
-//   4) Disparo             (RF-19)
-//   5) Acompanhamento      (RF-24/34)
+//   3) Disparo             (RF-19)
+//   4) Acompanhamento      (RF-24/34)
 //
 // O upload e a validação rodam 100% no navegador (não dependem do n8n).
 // A persistência (importarCarga) e o disparo dependem de webhooks do n8n
@@ -132,21 +131,7 @@ export default function TelaEtapa({ etapa }) {
         </section>
       )}
 
-      {/* 3) REMETENTE / INBOX ---------------------------------------- */}
-      <section className="secao">
-        <h2>3. Remetente / Inbox <small>(RF-22/23)</small></h2>
-        <p className="ajuda">
-          Esta etapa usa a inbox <code>{etapa.chaveConfigInbox}</code>.
-          {etapa.formato === 'educacional'
-            ? ' (Educacional usa um remetente próprio.)'
-            : ' (Cobrança usa remetente próprio — resp. Emerson Correia.)'}
-        </p>
-        <p className="pendente">
-          ⏳ A inbox é cadastrada na tela <b>Configurações</b> e lida daqui. (a fazer no n8n)
-        </p>
-      </section>
-
-      {/* 4) DISPARO + 5) ACOMPANHAMENTO ------------------------------ */}
+      {/* 3) DISPARO + 4) ACOMPANHAMENTO ------------------------------ */}
       <AcompanhamentoEtapa etapa={etapa} />
     </div>
   )
@@ -193,7 +178,7 @@ function AcompanhamentoEtapa({ etapa }) {
 
   return (
     <section className="secao">
-      <h2>4. Disparo e 5. Acompanhamento <small>(RF-19/24/34)</small></h2>
+      <h2>3. Disparo e 4. Acompanhamento <small>(RF-19/24/34)</small></h2>
 
       {etapa.modelos && etapa.modelos.length > 0 && (
         <div className="campo-modelo">
