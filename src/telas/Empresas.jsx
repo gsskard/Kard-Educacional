@@ -9,10 +9,8 @@ import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverP
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
 const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people']
 
-// Adicionar/editar/ocultar empresa dependem das rotas empresa-salvar/empresa-ocultar
-// no n8n, que ainda NÃO foram publicadas. Enquanto não existirem, os botões ficam
-// escondidos pra não dar erro de rede. Virar true assim que o backend subir.
-const CRUD_EMPRESA_ATIVO = false
+// Adicionar/editar/ocultar empresa usam as rotas empresa-salvar/empresa-ocultar do n8n.
+const CRUD_EMPRESA_ATIVO = true
 
 // Chip de confiança do domínio (verificação RDAP): % + bolinha colorida. Vazio =
 // não verificável → vermelho. Reusado nas duas visões de tabela de Empresas.
