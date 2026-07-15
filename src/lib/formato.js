@@ -38,3 +38,14 @@ export function confiancaDominio(score) {
   if (s >= 50) return { pct: s, cor: 'ambar', txt: 'nome coerente' }
   return { pct: s, cor: 'vermelho', txt: 'titular diverge' }
 }
+
+// Quantos e-mails de RH ainda dá pra auto-liberar numa empresa: teto de 3 no total,
+// só se a confiança do domínio ≥60% (pula vermelhos/divergentes e não verificados),
+// só o que ainda está pendente e limitado ao nº de RH (o back revela RH primeiro).
+export function faltaLiberarRh(e) {
+  if (Number(e?.dominio_score ?? -1) < 60) return 0
+  const revelados = Number(e?.revelados ?? 0)
+  const pendentes = Number(e?.total_prospects ?? 0) - revelados
+  const rh = Number(e?.total_rh ?? 0)
+  return Math.max(0, Math.min(3 - revelados, pendentes, rh))
+}

@@ -32,6 +32,7 @@ export const enriquecerEmpresa = (empresa, cnpj, forcar, dominio, cargosAlvo) =>
   empresasService.enriquecerEmpresa(empresa, cnpj, forcar, dominio, cargosAlvo)
 export const descobrirEmpresa = (empresa, cnpj, dominio) =>
   empresasService.descobrirEmpresa(empresa, cnpj, dominio)
+export const descobrirRapido = (empresa, cnpj) => empresasService.descobrirRapido(empresa, cnpj)
 export const salvarEmpresa = (dados) => empresasService.salvarEmpresa(dados)
 export const ocultarEmpresa = (cnpj, oculto) => empresasService.ocultarEmpresa(cnpj, oculto)
 export const sugerirDominios = (nome) => empresasService.sugerirDominios(nome)

@@ -65,6 +65,14 @@ export class EmpresasService {
     })
   }
 
+  // POST /crm-cobranca/rh-descobrir-rapido — descoberta RÁPIDA (pula ReceitaWS, então
+  // dá pra rodar em paralelo). Robô acha o domínio (Snov máx 3 + RDAP + IA) e já lista
+  // o RH (sem revelar e-mail = grátis). Responde a lista de prospects; o domínio
+  // escolhido/score/selo-robô ficam salvos e aparecem no GET rh-empresas.
+  async descobrirRapido(empresa, cnpj) {
+    return this.api.post('/crm-cobranca/rh-descobrir-rapido', { empresa, cnpj: cnpj || undefined })
+  }
+
   // GET /crm-cobranca/dominios — GRÁTIS. Domínios candidatos + contagem (Hunter email-count).
   async sugerirDominios(nome) {
     try {

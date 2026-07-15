@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, salvarEmpresa, ocultarEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, descobrirRapido, salvarEmpresa, ocultarEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
-import { nomeProprio, formatarCnpj, confiancaDominio } from '../lib/formato'
+import { nomeProprio, formatarCnpj, confiancaDominio, faltaLiberarRh } from '../lib/formato'
 import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverPendente, descartarPendente } from '../lib/loteJob'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
@@ -16,6 +16,13 @@ const CRUD_EMPRESA_ATIVO = false
 
 // Chip de confiança do domínio (verificação RDAP): % + bolinha colorida. Vazio =
 // não verificável → vermelho. Reusado nas duas visões de tabela de Empresas.
+// Selo "escolhido pelo robô": aparece quando o domínio foi decidido automaticamente
+// pela descoberta (IA + Snov + RDAP), sem o usuário ter forçado. Some se foi manual.
+function SeloRobo({ e }) {
+  if (!e || !(e.dominio_por_robo === true || e.dominio_por_robo === 't')) return null
+  return <span className="selo-robo" title="Domínio escolhido automaticamente pelo robô (IA + Snov + RDAP). Você pode trocar se estiver errado.">🤖 robô</span>
+}
+
 function ChipConfianca({ e }) {
   const cf = confiancaDominio(e.dominio_score)
   const tt = 'Confiança do domínio (RDAP): ' + (cf.pct != null ? cf.pct + '% · ' : '') + cf.txt
@@ -782,16 +789,8 @@ export default function Empresas() {
   const [desfazer, setDesfazer] = useState(null) // null | { cnpj, nome } — empresa recém-ocultada
   const [autoLib, setAutoLib] = useState(false)  // rodando o auto-liberar 3 RH (≥60%)
 
-  // Quantos RH ainda dá pra auto-liberar numa empresa: teto de 3 no total, só se
-  // a confiança do domínio ≥60% e ainda há prospects não revelados.
-  const faltaLiberar = (e) => {
-    if (Number(e.dominio_score ?? -1) < 60) return 0
-    const revelados = Number(e.revelados ?? 0)
-    const pendentes = Number(e.total_prospects ?? 0) - revelados
-    const rh = Number(e.total_rh ?? 0)
-    // teto de 3 no total, e só se a empresa tem RH (back revela RH primeiro)
-    return Math.max(0, Math.min(3 - revelados, pendentes, rh))
-  }
+  // teto de 3 RH por empresa, só ≥60% (helper compartilhado em lib/formato)
+  const faltaLiberar = faltaLiberarRh
 
   const chaveEmp = (e) => e.cnpj || e.empresa || ''
   const corEmp = (e) => confiancaDominio(e.dominio_score).cor  // 'verde' | 'ambar' | 'vermelho'
@@ -1146,7 +1145,7 @@ export default function Empresas() {
                 <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => setEmpresaAberta(chaveEmp(e))} title="Ver empresa">
                   <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{nomeProprio(e.empresa) || '—'}</span></td>
                   <td>{formatarCnpj(e.cnpj) || '—'}</td>
-                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}</td>
+                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}<SeloRobo e={e} /></td>
                   <td className="col-cen"><ChipConfianca e={e} /></td>
                   <td>{e.localizacao || '—'}</td>
                   <td>{e.porte || '—'}</td>
@@ -1195,7 +1194,7 @@ export default function Empresas() {
                     <td>{formatarCnpj(e.cnpj) || '—'}</td>
                     <td>{e.localizacao || '—'}</td>
                     <td>{e.porte || '—'}</td>
-                    <td>{e.dominio || '—'}<ChipConfianca e={e} /></td>
+                    <td>{e.dominio || '—'}<ChipConfianca e={e} /><SeloRobo e={e} /></td>
                   </>
                 )
                 if (contatos.length === 0) {
