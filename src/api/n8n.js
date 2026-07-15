@@ -7,6 +7,7 @@
 // (Pode migrar as telas para usar os serviços direto no futuro.)
 import { api } from '../services/ApiClient'
 import { cobrancaService } from '../services/CobrancaService'
+import { listasService } from '../services/ListasService'
 import { empresasService } from '../services/EmpresasService'
 import { rhService } from '../services/RhService'
 
@@ -16,6 +17,14 @@ export const importarContatos = (contatos) => cobrancaService.importarContatos(c
 export const moverContato = (id, etapa) => cobrancaService.moverContato(id, etapa)
 export const importarCarga = (etapa, registros) => cobrancaService.importarCarga(etapa, registros)
 export const dispararEtapa = (etapa, modelo) => cobrancaService.dispararEtapa(etapa, modelo)
+
+// --- Listas (mail merge) ---
+export const criarLista = (nome, etiquetas, etapa, registros) => listasService.criarLista(nome, etiquetas, etapa, registros)
+export const listarListas = () => listasService.listarListas()
+export const lerItensLista = (listaId) => listasService.lerItens(listaId)
+export const dispararLista = (listaId, modelo) => listasService.dispararLista(listaId, modelo)
+export const importarForaDaBase = (listaId) => listasService.importarFora(listaId)
+export const lerEnviosListas = () => listasService.lerEnvios()
 
 // --- Empresas ---
 export const listarEmpresas = () => empresasService.listarEmpresas()

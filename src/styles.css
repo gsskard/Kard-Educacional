@@ -519,12 +519,8 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
   background: #2563eb; border-radius: 999px; padding: 1px 7px; }
 .dom-cand.confere { border-color: #2563eb; background: #eff6ff; }
 /* verificação RDAP na tela de Empresas (painel + tabela) */
-.dom-difere { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 700; color: #92400e;
-  background: #fef3c7; border: 1px solid #fde68a; border-radius: 999px; padding: 1px 7px; }
 .dom-titular { color: var(--navy); }
 .dom-titular small { color: var(--muted); }
-.dom-tick { margin-left: 6px; color: #16a34a; font-weight: 800; cursor: help; }
-.dom-warn { margin-left: 6px; color: #d97706; cursor: help; }
 /* chip de confiança do domínio (%) — tela Empresas (painel + tabela) */
 .conf-chip { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px;
   font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
@@ -536,6 +532,28 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .conf-ambar .conf-dot { background: var(--ambar); }
 .conf-vermelho { color: #991b1b; background: var(--vermelho-50); border-color: #fecaca; }
 .conf-vermelho .conf-dot { background: var(--vermelho); }
+
+/* cabeçalho de tabela clicável (ordenação) */
+.th-ord { cursor: pointer; user-select: none; white-space: nowrap; }
+.th-ord:hover { background: #eef2f8; }
+.th-ord .th-label { display: inline-flex; align-items: center; gap: 5px; }
+.th-ord .sort-ind { font-size: 10px; color: var(--muted); opacity: .5; }
+.th-ord.ativo { color: var(--navy); }
+.th-ord.ativo .sort-ind { color: var(--verde-600); opacity: 1; }
+
+/* barra de filtro por cor da confiança */
+.filtro-cor { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.fc-label { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.fc-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+  color: var(--navy); background: var(--card); border: 1px solid var(--borda-forte);
+  border-radius: 999px; padding: 5px 12px; }
+.fc-chip:hover { border-color: var(--verde); }
+.fc-chip b { font-weight: 800; }
+.fc-chip.ativo { border-width: 2px; box-shadow: 0 0 0 1px currentColor inset; }
+.fc-chip.conf-verde.ativo { border-color: var(--verde); }
+.fc-chip.conf-ambar.ativo { border-color: var(--ambar); }
+.fc-chip.conf-vermelho.ativo { border-color: var(--vermelho); }
+.fc-chip.ativo:not(.conf-verde):not(.conf-ambar):not(.conf-vermelho) { border-color: var(--navy); }
 
 /* Fase "Confirmar domínio" do lote (empresas incertas) */
 .confirmar-dominio { margin-top: 20px; padding: 16px 18px; border: 1px solid #fde68a;

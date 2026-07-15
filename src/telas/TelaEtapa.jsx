@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listarContatos, importarCarga, dispararEtapa } from '../api/n8n'
+import {
+  criarLista, listarListas, dispararLista, importarForaDaBase, lerEnviosListas,
+} from '../api/n8n'
 import PillStatus from '../componentes/PillStatus'
 
-// Tela "espelho" reusada pelas etapas (Educacional, Cobrança).
-// Recebe a config da etapa e monta as 5 seções da Fase 1 (Claude2.md seção 8):
-//   1) Upload do arquivo   (RF-26)
-//   2) Conferência da carga (RF-27/28)
-//   3) Disparo             (RF-19)
-//   4) Acompanhamento      (RF-24/34)
-//
-// O upload e a validação rodam 100% no navegador (não dependem do n8n).
-// A persistência (importarCarga) e o disparo dependem de webhooks do n8n
-// que ainda serão criados — por isso ficam marcados como PENDENTE.
+// Tela "espelho" reusada pelas etapas (Educacional, Cobrança) — modelo MAIL MERGE:
+// 1) Upload do arquivo (RF-26) — CSV com cnpj + email dos clientes
+// 2) Conferência + salvar como LISTA nomeada com etiquetas (RF-27/28)
+//    → o n8n CRUZA cada linha (CNPJ **e** e-mail juntos) com a base prospectada
+//      (rh_enriquecimento). Só quem casa fica elegível para envio.
+//    → linhas "fora da base" aparecem aqui e podem ser importadas com um clique.
+// 3) Disparo por LISTA salva (RF-19) — escolhe lista + modelo de e-mail
+// 4) Acompanhamento (RF-24/34) — log de envios (cnpj/email/data) p/ analytics
 
 // -------- CSV bem simples (sem dependência): detecta ; ou , --------
 function parseCSV(texto) {
@@ -29,15 +29,26 @@ function parseCSV(texto) {
 }
 
 export default function TelaEtapa({ etapa }) {
-  const [carga, setCarga] = useState(null)   // { cabecalho, registros }
   const [nomeArquivo, setNomeArquivo] = useState('')
-  const [msg, setMsg] = useState('')
   const [arrastando, setArrastando] = useState(false)
+  const [carga, setCarga] = useState(null)
+
+  // metadados da lista (mail merge)
+  const [nomeLista, setNomeLista] = useState('')
+  const [etiquetas, setEtiquetas] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [resultado, setResultado] = useState(null) // { lista_id, total, casados, fora[] }
+  const [msg, setMsg] = useState('')
+
+  // gatilho para as seções de disparo/acompanhamento recarregarem as listas
+  const [versaoListas, setVersaoListas] = useState(0)
 
   function processarArquivo(arquivo) {
     if (!arquivo) return
     setNomeArquivo(arquivo.name)
+    setResultado(null)
     setMsg('')
+    if (!nomeLista) setNomeLista(arquivo.name.replace(/\.csv$/i, ''))
     const leitor = new FileReader()
     leitor.onload = () => setCarga(parseCSV(String(leitor.result)))
     leitor.readAsText(arquivo, 'utf-8')
@@ -53,7 +64,7 @@ export default function TelaEtapa({ etapa }) {
     processarArquivo(e.dataTransfer.files?.[0])
   }
 
-  // Conferência: quais colunas esperadas estão faltando / sobrando (RF-27)
+  // Conferência da carga (RF-27): colunas esperadas vs presentes.
   const conferencia = useMemo(() => {
     if (!carga) return null
     const esperadas = etapa.colunasEsperadas
@@ -63,13 +74,44 @@ export default function TelaEtapa({ etapa }) {
     return { faltando, extras, total: carga.registros.length }
   }, [carga, etapa])
 
-  async function confirmarImportacao() {
+  // chave do cruzamento: cnpj (ou cnpj_empregador na Cobrança) + email
+  const temChaves = useMemo(() => {
+    if (!carga) return false
+    const cols = carga.cabecalho
+    return (cols.includes('cnpj') || cols.includes('cnpj_empregador')) && cols.includes('email')
+  }, [carga])
+
+  async function salvarLista() {
+    if (!carga) return
     try {
-      setMsg('Enviando carga para o n8n...')
-      await importarCarga(etapa.valorEtapa, carga.registros)
-      setMsg('Carga importada com sucesso.')
+      setSalvando(true)
+      setMsg('Salvando lista e cruzando com a base prospectada...')
+      const r = await criarLista(
+        nomeLista || 'Lista sem nome',
+        etiquetas.split(',').map((t) => t.trim()).filter(Boolean),
+        etapa.valorEtapa,
+        carga.registros,
+      )
+      setResultado(r)
+      setVersaoListas((v) => v + 1)
+      setMsg(`Lista "${r.nome}" salva: ${r.casados} de ${r.total} casaram com a base.`)
     } catch (err) {
-      setMsg('⏳ ' + err.message)
+      setMsg('Erro ao salvar a lista: ' + err.message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function importarFora() {
+    if (!resultado) return
+    try {
+      setMsg('Importando contatos fora da base...')
+      const r = await importarForaDaBase(resultado.lista_id)
+      setMsg(`${r.importados} contato(s) importados para a base. Agora todos da lista estão elegíveis.`)
+      setResultado({ ...resultado, casados: resultado.total, fora: [] })
+      setVersaoListas((v) => v + 1)
+    } catch (err) {
+      setMsg('Erro ao importar: ' + err.message)
     }
   }
 
@@ -86,10 +128,8 @@ export default function TelaEtapa({ etapa }) {
       <section className="secao">
         <h2>1. Upload do arquivo <small>(RF-26)</small></h2>
         <p className="ajuda">
-          Envie o arquivo da etapa <b>{etapa.titulo}</b> (.csv).{' '}
-          {etapa.formato === 'cobranca'
-            ? 'Formato do Anexo A (Cobrança).'
-            : 'Formato educacional.'}
+          Envie o arquivo da etapa <b>{etapa.titulo}</b> (.csv) com <b>cnpj</b> e <b>email</b> dos clientes.
+          O sistema cruza cada linha com a base prospectada — só quem casa (CNPJ + e-mail) recebe o disparo.
         </p>
         <label
           className={'dropzone' + (arrastando ? ' arrastando' : '') + (nomeArquivo ? ' tem-arquivo' : '')}
@@ -102,32 +142,33 @@ export default function TelaEtapa({ etapa }) {
           {nomeArquivo ? (
             <>
               <div className="dropzone-titulo">{nomeArquivo}</div>
-              <div className="dropzone-sub">Clique ou arraste outro arquivo para substituir</div>
+              <div className="dropzone-sub">Clique para substituir</div>
             </>
           ) : (
             <>
-              <div className="dropzone-titulo">Arraste o CSV aqui ou <span className="dropzone-link">escolha um arquivo</span></div>
-              <div className="dropzone-sub">Apenas .csv · formato {etapa.formato}</div>
+              <div className="dropzone-titulo">Arraste o CSV ou <span className="dropzone-link">escolha um arquivo</span></div>
+              <div className="dropzone-sub">Apenas .csv no formato {etapa.formato}</div>
             </>
           )}
         </label>
       </section>
 
-      {/* 2) CONFERÊNCIA ---------------------------------------------- */}
-      {conferencia && (
+      {/* 2) CONFERÊNCIA + SALVAR LISTA ------------------------------- */}
+      {carga && conferencia && (
         <section className="secao">
-          <h2>2. Conferência da carga <small>(RF-27/28)</small></h2>
+          <h2>2. Conferência e lista <small>(RF-27/28)</small></h2>
           <div className="resumo-carga">
             <div><b>{conferencia.total}</b> registros lidos</div>
             {conferencia.faltando.length > 0 ? (
-              <div className="alerta">
-                Colunas obrigatórias faltando: {conferencia.faltando.join(', ')}
-              </div>
+              <div className="erro">Colunas faltando: {conferencia.faltando.join(', ')}</div>
             ) : (
-              <div className="ok">Todas as colunas esperadas estão presentes ✓</div>
+              <div className="ok">Todas as colunas esperadas presentes ✓</div>
             )}
             {conferencia.extras.length > 0 && (
-              <div className="ajuda">Colunas extras (ignoradas): {conferencia.extras.join(', ')}</div>
+              <div>Colunas extras (vão junto no merge): {conferencia.extras.join(', ')}</div>
+            )}
+            {!temChaves && (
+              <div className="erro">O arquivo precisa das colunas <b>cnpj</b> (ou cnpj_empregador) e <b>email</b> para o cruzamento.</div>
             )}
           </div>
 
@@ -145,60 +186,126 @@ export default function TelaEtapa({ etapa }) {
           </div>
           <small className="ajuda">Mostrando as 5 primeiras linhas.</small>
 
+          <div className="campo-modelo">
+            <label>Nome da lista</label>
+            <input
+              type="text"
+              value={nomeLista}
+              placeholder="ex.: Carga julho educacional"
+              onChange={(e) => setNomeLista(e.target.value)}
+            />
+          </div>
+          <div className="campo-modelo">
+            <label>Etiquetas (separadas por vírgula)</label>
+            <input
+              type="text"
+              value={etiquetas}
+              placeholder="ex.: julho, prioridade, sp"
+              onChange={(e) => setEtiquetas(e.target.value)}
+            />
+          </div>
+
           <div className="acoes">
             <button
               className="btn-primario"
               style={{ background: etapa.cor }}
-              disabled={conferencia.faltando.length > 0}
-              onClick={confirmarImportacao}
+              disabled={!temChaves || salvando || !nomeLista.trim()}
+              onClick={salvarLista}
             >
-              Confirmar importação
+              {salvando ? 'Cruzando…' : 'Salvar lista e cruzar com a base'}
             </button>
           </div>
           {msg && <div className="banner">{msg}</div>}
+
+          {/* resultado do cruzamento */}
+          {resultado && (
+            <div className="resumo-carga" style={{ marginTop: 14 }}>
+              <div><b>{resultado.casados}</b> de <b>{resultado.total}</b> casaram com a base prospectada (elegíveis para envio).</div>
+              {resultado.fora && resultado.fora.length > 0 && (
+                <>
+                  <div className="erro">{resultado.fora.length} fora da base (não recebem e-mail):</div>
+                  <div className="preview-wrap">
+                    <table className="preview">
+                      <thead>
+                        <tr><th>Nome</th><th>CNPJ</th><th>E-mail</th></tr>
+                      </thead>
+                      <tbody>
+                        {resultado.fora.slice(0, 20).map((f, i) => (
+                          <tr key={i}>
+                            <td>{f.nome || '—'}</td>
+                            <td>{f.cnpj || '—'}</td>
+                            <td>{f.email || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="acoes">
+                    <button className="btn-secundario" onClick={importarFora}>
+                      Importar {resultado.fora.length} contato(s) para a base
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </section>
       )}
 
-      {/* 3) DISPARO + 4) ACOMPANHAMENTO ------------------------------ */}
-      <AcompanhamentoEtapa etapa={etapa} />
+      {/* 3) DISPARO POR LISTA + 4) ACOMPANHAMENTO -------------------- */}
+      <DisparoPorLista etapa={etapa} versaoListas={versaoListas} />
     </div>
   )
 }
 
-// Seções 4 (disparo) e 5 (acompanhamento): lê os contatos reais do n8n e
-// mostra os que pertencem a esta etapa.
-function AcompanhamentoEtapa({ etapa }) {
-  const [rows, setRows] = useState([])
+// Seções 3 (disparo por lista salva) e 4 (acompanhamento/analytics de envios).
+function DisparoPorLista({ etapa, versaoListas }) {
+  const [listas, setListas] = useState([])
+  const [envios, setEnvios] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [msg, setMsg] = useState('')
   const [disparando, setDisparando] = useState(false)
+  const [listaSel, setListaSel] = useState('')
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState('')
   const [modelo, setModelo] = useState((etapa.modelos && etapa.modelos[0]?.id) || '')
 
   async function carregar() {
     setLoading(true); setErro('')
     try {
-      setRows(await listarContatos())
+      const [ls, es] = await Promise.all([listarListas(), lerEnviosListas()])
+      setListas(ls)
+      setEnvios(es)
     } catch (e) {
-      setErro('Não consegui ler os contatos do n8n (' + e.message + ')')
+      setErro('Não consegui ler as listas do n8n (' + e.message + ')')
     } finally {
       setLoading(false)
     }
   }
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar() }, [versaoListas])
 
-  const daEtapa = rows.filter((r) => (r.etapa || 'Educacional') === etapa.valorEtapa)
+  // só listas desta etapa; filtro opcional por etiqueta
+  const daEtapa = listas.filter((l) => (l.etapa || 'Educacional') === etapa.valorEtapa)
+  const filtradas = filtroEtiqueta
+    ? daEtapa.filter((l) => (l.etiquetas || '').toLowerCase().includes(filtroEtiqueta.toLowerCase()))
+    : daEtapa
+  const lista = filtradas.find((l) => String(l.id) === String(listaSel)) || null
 
   const modeloAtual = (etapa.modelos || []).find((m) => m.id === modelo)
 
+  const enviosDaEtapa = envios.filter((e) => (e.etapa || '') === etapa.valorEtapa)
+
   async function disparar() {
-    if (!window.confirm(`Disparar o modelo "${modeloAtual?.nome || modelo}" de ${etapa.titulo} para ${daEtapa.length} contato(s)?`)) return
-    setDisparando(true); setMsg('')
+    if (!lista) return
+    if (!window.confirm(`Disparar o modelo "${modeloAtual?.nome || modelo}" para os ${lista.casados} contato(s) casados da lista "${lista.nome}"?`)) return
     try {
-      await dispararEtapa(etapa.valorEtapa, modelo)
-      setMsg('Disparo enviado ao n8n. Atualize em instantes para ver o status.')
+      setDisparando(true)
+      setMsg('Disparando…')
+      const r = await dispararLista(lista.id, modelo)
+      setMsg(`Disparo concluído: ${r.enviados} enviado(s), ${r.falhas} falha(s).`)
+      carregar()
     } catch (e) {
-      setMsg('⏳ Falha ao disparar: ' + e.message + ' (o workflow "Disparar por Etapa" está ativo no n8n?)')
+      setMsg('Erro no disparo: ' + e.message)
     } finally {
       setDisparando(false)
     }
@@ -206,54 +313,85 @@ function AcompanhamentoEtapa({ etapa }) {
 
   return (
     <section className="secao">
-      <h2>3. Disparo e 4. Acompanhamento <small>(RF-19/24/34)</small></h2>
-
-      {etapa.modelos && etapa.modelos.length > 0 && (
-        <div className="campo-modelo">
-          <label>Modelo do e-mail</label>
-          <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
-            {etapa.modelos.map((m) => (
-              <option key={m.id} value={m.id}>{m.nome}</option>
-            ))}
-          </select>
-          {modeloAtual && <span className="ajuda">{modeloAtual.descricao}</span>}
-        </div>
-      )}
-
-      <div className="acoes">
-        <button
-          className="btn-primario"
-          disabled={disparando || daEtapa.length === 0}
-          onClick={disparar}
-        >
-          {disparando ? 'Disparando…' : `Disparar ${etapa.titulo} (${daEtapa.length})`}
-        </button>
-        <button className="btn-refresh" onClick={carregar}>Atualizar</button>
-      </div>
-      {msg && <div className="banner">{msg}</div>}
-      {erro && <div className="banner">{erro}</div>}
+      <h2>3. Disparo por lista e acompanhamento <small>(RF-19/24/34)</small></h2>
 
       {loading ? (
         <div className="loading">Carregando…</div>
       ) : (
         <>
-          <div className="ajuda">{daEtapa.length} contato(s) nesta etapa.</div>
+          {erro && <div className="banner">{erro}</div>}
+
+          <div className="campo-modelo">
+            <label>Filtrar por etiqueta</label>
+            <input
+              type="text"
+              value={filtroEtiqueta}
+              placeholder="ex.: julho"
+              onChange={(e) => setFiltroEtiqueta(e.target.value)}
+            />
+          </div>
+
+          <div className="campo-modelo">
+            <label>Lista salva ({filtradas.length} nesta etapa)</label>
+            <select value={listaSel} onChange={(e) => setListaSel(e.target.value)}>
+              <option value="">— escolha uma lista —</option>
+              {filtradas.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nome} · {l.casados}/{l.total} casados · {l.etiquetas || 'sem etiqueta'} · {l.criada_em}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {etapa.modelos && etapa.modelos.length > 0 && (
+            <div className="campo-modelo">
+              <label>Modelo de e-mail</label>
+              <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
+                {etapa.modelos.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nome}</option>
+                ))}
+              </select>
+              {modeloAtual && <span className="ajuda">{modeloAtual.descricao}</span>}
+            </div>
+          )}
+
+          <div className="acoes">
+            <button
+              className="btn-primario"
+              style={{ background: etapa.cor }}
+              disabled={disparando || !lista || !lista.casados}
+              onClick={disparar}
+            >
+              {disparando ? 'Disparando…' : lista
+                ? `Disparar "${lista.nome}" (${lista.casados} casados)`
+                : 'Disparar (escolha uma lista)'}
+            </button>
+            <button className="btn-refresh" onClick={carregar}>Atualizar</button>
+          </div>
+          {msg && <div className="banner">{msg}</div>}
+
+          {/* 4) acompanhamento: log de envios (analytics) */}
+          <div className="ajuda" style={{ marginTop: 18 }}>
+            {enviosDaEtapa.length} envio(s) registrados nesta etapa.
+          </div>
           <table className="preview">
             <thead>
-              <tr><th>Nome</th><th>E-mail</th><th>Etapa</th><th>Status envio</th><th>Inbox origem</th></tr>
+              <tr><th>Data</th><th>Lista</th><th>Etiquetas</th><th>CNPJ</th><th>E-mail</th><th>Modelo</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {daEtapa.slice(0, 20).map((r, i) => (
-                <tr key={r.id ?? i}>
-                  <td>{r.nome || '—'}</td>
-                  <td>{r.email || '—'}</td>
-                  <td>{r.etapa || '—'}</td>
-                  <td><PillStatus status={r.status_envio} /></td>
-                  <td>{r.inbox || <span className="ajuda">a capturar</span>}</td>
+              {enviosDaEtapa.slice(0, 20).map((e, i) => (
+                <tr key={e.id ?? i}>
+                  <td>{e.data_envio || '—'}</td>
+                  <td>{e.lista || '—'}</td>
+                  <td>{e.etiquetas || '—'}</td>
+                  <td>{e.cnpj || '—'}</td>
+                  <td>{e.email || '—'}</td>
+                  <td>{e.modelo || '—'}</td>
+                  <td><PillStatus status={e.status} /></td>
                 </tr>
               ))}
-              {daEtapa.length === 0 && (
-                <tr><td colSpan={5} className="empty">Nenhum contato nesta etapa.</td></tr>
+              {enviosDaEtapa.length === 0 && (
+                <tr><td colSpan={7} className="empty">Nenhum envio registrado nesta etapa.</td></tr>
               )}
             </tbody>
           </table>

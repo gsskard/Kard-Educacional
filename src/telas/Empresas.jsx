@@ -725,8 +725,43 @@ export default function Empresas() {
   const [revelando, setRevelando] = useState(new Set()) // ids de RH sendo desbloqueados
   const [mostrarSemEmail, setMostrarSemEmail] = useState(false) // na Tabela: exibir contatos sem e-mail liberado
   const [empresaAberta, setEmpresaAberta] = useState(null)      // chave da empresa com o painel lateral aberto
+  const [ordCol, setOrdCol] = useState(null)     // coluna de ordenação (null = ordem do back)
+  const [ordDir, setOrdDir] = useState('asc')    // 'asc' | 'desc'
+  const [filtroCor, setFiltroCor] = useState('todas') // 'todas' | 'verde' | 'ambar' | 'vermelho'
 
   const chaveEmp = (e) => e.cnpj || e.empresa || ''
+  const corEmp = (e) => confiancaDominio(e.dominio_score).cor  // 'verde' | 'ambar' | 'vermelho'
+
+  // Ordenação: valor comparável por coluna. Numéricas (contatos/confiança/data)
+  // comparam número; as demais texto (localeCompare pt-BR).
+  const COLS_NUM = ['contatos', 'confianca', 'enriquecido']
+  function valOrdenar(e, col) {
+    switch (col) {
+      case 'empresa': return nomeProprio(e.empresa) || ''
+      case 'cnpj': return String(e.cnpj || '')
+      case 'dominio': return String(e.dominio || '').toLowerCase()
+      case 'localizacao': return String(e.localizacao || '').toLowerCase()
+      case 'porte': return String(e.porte || '').toLowerCase()
+      case 'contatos': return Number(e.total_prospects ?? 0)
+      case 'confianca': return Number(e.dominio_score ?? -1)
+      case 'enriquecido': { // "DD/MM/YYYY" → AAAAMMDD
+        const m = String(e.enriquecido_em || '').match(/(\d{2})\/(\d{2})\/(\d{4})/)
+        return m ? Number(m[3] + m[2] + m[1]) : 0
+      }
+      default: return ''
+    }
+  }
+  function ordenarPor(col) {
+    if (ordCol === col) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setOrdCol(col); setOrdDir(COLS_NUM.includes(col) ? 'desc' : 'asc') }
+  }
+  // cabeçalho clicável: mostra ▲/▼ na coluna ativa, ⇅ nas demais
+  const thOrd = (col, label, cls = '') => (
+    <th className={'th-ord' + (cls ? ' ' + cls : '') + (ordCol === col ? ' ativo' : '')}
+      onClick={() => ordenarPor(col)} title="Ordenar por esta coluna">
+      <span className="th-label">{label}<span className="sort-ind">{ordCol === col ? (ordDir === 'asc' ? '▲' : '▼') : '⇅'}</span></span>
+    </th>
+  )
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -740,13 +775,36 @@ export default function Empresas() {
   }
   useEffect(() => { carregar() }, [])
 
-  const visiveis = useMemo(() => {
+  // 1) só a busca textual (base para as contagens do filtro de cor)
+  const porBusca = useMemo(() => {
     const q = busca.trim().toLowerCase()
     if (!q) return rows
     return rows.filter((e) =>
       [e.empresa, e.cnpj, e.dominio, e.localizacao].some((c) => String(c || '').toLowerCase().includes(q))
     )
   }, [rows, busca])
+
+  // contagem por cor (dentro do que a busca já filtrou) — alimenta os chips
+  const contagemCor = useMemo(() => {
+    const c = { verde: 0, ambar: 0, vermelho: 0 }
+    for (const e of porBusca) c[corEmp(e)]++
+    return c
+  }, [porBusca])
+
+  // 2) aplica filtro de cor + ordenação por coluna
+  const visiveis = useMemo(() => {
+    let arr = filtroCor === 'todas' ? porBusca : porBusca.filter((e) => corEmp(e) === filtroCor)
+    if (ordCol) {
+      const num = COLS_NUM.includes(ordCol)
+      const sinal = ordDir === 'asc' ? 1 : -1
+      arr = [...arr].sort((a, b) => {
+        const va = valOrdenar(a, ordCol), vb = valOrdenar(b, ordCol)
+        const r = num ? (va - vb) : String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' })
+        return sinal * r
+      })
+    }
+    return arr
+  }, [porBusca, filtroCor, ordCol, ordDir])
 
   // Exporta a tabela (uma linha por contato de RH) em CSV que o Excel abre.
   // BOM UTF-8 pros acentos e ; como separador (padrão do Excel pt-BR).
@@ -884,6 +942,22 @@ export default function Empresas() {
         </button>
       </div>
 
+      <div className="filtro-cor">
+        <span className="fc-label">Confiança do domínio:</span>
+        {[
+          { k: 'todas', txt: 'Todas', n: porBusca.length },
+          { k: 'verde', txt: 'Confere', n: contagemCor.verde },
+          { k: 'ambar', txt: 'Nome coerente', n: contagemCor.ambar },
+          { k: 'vermelho', txt: 'Revisar', n: contagemCor.vermelho },
+        ].map(({ k, txt, n }) => (
+          <button key={k}
+            className={'fc-chip' + (filtroCor === k ? ' ativo' : '') + (k !== 'todas' ? ' conf-' + k : '')}
+            onClick={() => setFiltroCor((cur) => (cur === k ? 'todas' : k))}>
+            {k !== 'todas' && <i className="conf-dot" />}{txt} <b>{n}</b>
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="loading">Carregando…</div>
       ) : visiveis.length === 0 ? (
@@ -893,13 +967,14 @@ export default function Empresas() {
           <table className="preview">
             <thead>
               <tr>
-                <th>Empresa</th>
-                <th>CNPJ</th>
-                <th>Domínio</th>
-                <th>Localização</th>
-                <th>Porte</th>
-                <th className="col-cen">Contatos</th>
-                <th>Enriquecido em</th>
+                {thOrd('empresa', 'Empresa')}
+                {thOrd('cnpj', 'CNPJ')}
+                {thOrd('dominio', 'Domínio')}
+                {thOrd('confianca', 'Confiança', 'col-cen')}
+                {thOrd('localizacao', 'Localização')}
+                {thOrd('porte', 'Porte')}
+                {thOrd('contatos', 'Contatos', 'col-cen')}
+                {thOrd('enriquecido', 'Enriquecido em')}
               </tr>
             </thead>
             <tbody>
@@ -907,14 +982,15 @@ export default function Empresas() {
                 <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => setEmpresaAberta(chaveEmp(e))} title="Ver empresa">
                   <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{nomeProprio(e.empresa) || '—'}</span></td>
                   <td>{formatarCnpj(e.cnpj) || '—'}</td>
-                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}<ChipConfianca e={e} /></td>
+                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}</td>
+                  <td className="col-cen"><ChipConfianca e={e} /></td>
                   <td>{e.localizacao || '—'}</td>
                   <td>{e.porte || '—'}</td>
                   <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
                   <td>{e.enriquecido_em || '—'}</td>
                 </tr>
               ))}
-              {visiveis.length === 0 && <tr><td colSpan={7} className="empty">Nenhuma empresa.</td></tr>}
+              {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhuma empresa.</td></tr>}
             </tbody>
           </table>
           <small className="ajuda">Clique numa empresa pra abrir o painel com domínio, contatos e ações (desbloquear e-mail, trocar domínio, reenriquecer).</small>
@@ -924,11 +1000,11 @@ export default function Empresas() {
           <table className="grade">
             <thead>
               <tr>
-                <th className="col-emp">Empresa</th>
-                <th>CNPJ</th>
-                <th>Localização</th>
-                <th>Porte</th>
-                <th>Domínio</th>
+                {thOrd('empresa', 'Empresa', 'col-emp')}
+                {thOrd('cnpj', 'CNPJ')}
+                {thOrd('localizacao', 'Localização')}
+                {thOrd('porte', 'Porte')}
+                {thOrd('dominio', 'Domínio')}
                 <th>Nome</th>
                 <th>Cargo</th>
                 <th>E-mail</th>
