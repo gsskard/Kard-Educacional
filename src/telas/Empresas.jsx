@@ -2,12 +2,26 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
-import { nomeProprio, formatarCnpj } from '../lib/formato'
+import { nomeProprio, formatarCnpj, confiancaDominio } from '../lib/formato'
 import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverPendente, descartarPendente } from '../lib/loteJob'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
 const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people']
+
+// Chip de confiança do domínio (verificação RDAP): % + bolinha colorida. Vazio =
+// não verificável → vermelho. Reusado nas duas visões de tabela de Empresas.
+function ChipConfianca({ e }) {
+  const cf = confiancaDominio(e.dominio_score)
+  const tt = 'Confiança do domínio (RDAP): ' + (cf.pct != null ? cf.pct + '% · ' : '') + cf.txt
+    + (e.razao_titular ? ' · titular: ' + e.razao_titular : '')
+    + (e.cnpj_titular ? ' · CNPJ ' + e.cnpj_titular : '')
+  return (
+    <span className={'conf-chip conf-' + cf.cor} title={tt}>
+      <i className="conf-dot" />{cf.pct != null ? cf.pct + '%' : '—'}
+    </span>
+  )
+}
 
 // Painel de troca de domínio: lista os domínios que a IA/Snov acharam com a
 // contagem de e-mails públicos (grátis) + campo manual. Clicar em "enriquecer"
@@ -893,7 +907,7 @@ export default function Empresas() {
                 <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => setEmpresaAberta(chaveEmp(e))} title="Ver empresa">
                   <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{nomeProprio(e.empresa) || '—'}</span></td>
                   <td>{formatarCnpj(e.cnpj) || '—'}</td>
-                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}{e.dominio_confere === true && <span className="dom-tick" title={'CNPJ confere' + (e.razao_titular ? ' · ' + e.razao_titular : '')}>✓</span>}{e.dominio_confere === false && <span className="dom-warn" title={'titular difere (RDAP): ' + (e.razao_titular || 'sem CNPJ')}>⚠</span>}</td>
+                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}<ChipConfianca e={e} /></td>
                   <td>{e.localizacao || '—'}</td>
                   <td>{e.porte || '—'}</td>
                   <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
@@ -935,7 +949,7 @@ export default function Empresas() {
                     <td>{formatarCnpj(e.cnpj) || '—'}</td>
                     <td>{e.localizacao || '—'}</td>
                     <td>{e.porte || '—'}</td>
-                    <td>{e.dominio || '—'}{e.dominio_confere === true && <span className="dom-tick" title={'CNPJ confere' + (e.razao_titular ? ' · ' + e.razao_titular : '')}>✓</span>}{e.dominio_confere === false && <span className="dom-warn" title={'titular difere (RDAP): ' + (e.razao_titular || 'sem CNPJ')}>⚠</span>}</td>
+                    <td>{e.dominio || '—'}<ChipConfianca e={e} /></td>
                   </>
                 )
                 if (contatos.length === 0) {

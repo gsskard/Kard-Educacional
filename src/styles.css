@@ -525,6 +525,17 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .dom-titular small { color: var(--muted); }
 .dom-tick { margin-left: 6px; color: #16a34a; font-weight: 800; cursor: help; }
 .dom-warn { margin-left: 6px; color: #d97706; cursor: help; }
+/* chip de confiança do domínio (%) — tela Empresas (painel + tabela) */
+.conf-chip { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px;
+  font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid transparent; vertical-align: middle; cursor: help; white-space: nowrap; }
+.conf-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+.conf-verde { color: var(--verde-600); background: var(--verde-50); border-color: #bbf7d0; }
+.conf-verde .conf-dot { background: var(--verde); }
+.conf-ambar { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+.conf-ambar .conf-dot { background: var(--ambar); }
+.conf-vermelho { color: #991b1b; background: var(--vermelho-50); border-color: #fecaca; }
+.conf-vermelho .conf-dot { background: var(--vermelho); }
 
 /* Fase "Confirmar domínio" do lote (empresas incertas) */
 .confirmar-dominio { margin-top: 20px; padding: 16px 18px; border: 1px solid #fde68a;

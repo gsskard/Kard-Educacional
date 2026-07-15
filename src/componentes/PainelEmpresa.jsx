@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import CompanyLogo from './CompanyLogo'
 import { enriquecerEmpresa, sugerirDominios, rhRevelar } from '../api/n8n'
-import { nomeProprio, formatarCnpj } from '../lib/formato'
+import { nomeProprio, formatarCnpj, confiancaDominio } from '../lib/formato'
 
 // Painel lateral ÚNICO (gaveta estilo HubSpot) com o "perfil" da empresa.
 // É autossuficiente: chama os serviços por dentro (desbloquear e-mail, trocar
@@ -176,12 +176,17 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
             <span className="dom-linha">
               {e.dominio || '—'}
               {e.dominio_count != null && <small className="dom-count">· {e.dominio_count} e-mail(s)</small>}
-              {e.dominio_confere === true && (
-                <small className="dom-confere" title={e.razao_titular ? 'Titular do domínio (RDAP): ' + e.razao_titular : 'CNPJ do titular do domínio confere com o CNPJ da empresa'}>CNPJ confere ✓</small>
-              )}
-              {e.dominio_confere === false && (
-                <small className="dom-difere" title={'Titular do domínio (RDAP): ' + (e.razao_titular || '—') + (e.cnpj_titular ? ' · CNPJ ' + e.cnpj_titular : ' · sem CNPJ')}>titular difere</small>
-              )}
+              {(() => {
+                const cf = confiancaDominio(e.dominio_score)
+                const tt = 'Confiança do domínio (RDAP): ' + (cf.pct != null ? cf.pct + '% · ' : '') + cf.txt
+                  + (e.razao_titular ? ' · titular: ' + e.razao_titular : '')
+                  + (e.cnpj_titular ? ' · CNPJ ' + e.cnpj_titular : '')
+                return (
+                  <span className={'conf-chip conf-' + cf.cor} title={tt}>
+                    <i className="conf-dot" />{cf.pct != null ? cf.pct + '%' : 'não verificado'}
+                  </span>
+                )
+              })()}
               <button className="link-mini" onClick={() => setPicker((v) => !v)}>trocar</button>
             </span>
           </div>
