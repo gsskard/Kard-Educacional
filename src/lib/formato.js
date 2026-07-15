@@ -27,3 +27,14 @@ export function formatarCnpj(valor) {
   if (d.length !== 14) return ''
   return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3.$4-$5')
 }
+
+// Confiança do domínio (score 0-100 do RDAP, guardado no back). Sem score = vazio →
+// vermelho ("não verificado"). Usado pela tela Empresas p/ mostrar % + bolinha.
+//  >=85 verde (CNPJ confere / mesma raiz) · >=50 âmbar (nome coerente) · resto vermelho.
+export function confiancaDominio(score) {
+  const s = Number(score)
+  if (score == null || Number.isNaN(s)) return { pct: null, cor: 'vermelho', txt: 'não verificado' }
+  if (s >= 85) return { pct: s, cor: 'verde', txt: 'domínio confere' }
+  if (s >= 50) return { pct: s, cor: 'ambar', txt: 'nome coerente' }
+  return { pct: s, cor: 'vermelho', txt: 'titular diverge' }
+}
