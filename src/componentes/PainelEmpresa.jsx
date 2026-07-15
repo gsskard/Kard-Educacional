@@ -187,6 +187,9 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
                   </span>
                 )
               })()}
+              {(e.dominio_por_robo === true || e.dominio_por_robo === 't') && (
+                <span className="selo-robo" title="Domínio escolhido automaticamente pelo robô (IA + Snov + RDAP). Troque se estiver errado.">🤖 robô</span>
+              )}
               <button className="link-mini" onClick={() => setPicker((v) => !v)}>trocar</button>
             </span>
           </div>
