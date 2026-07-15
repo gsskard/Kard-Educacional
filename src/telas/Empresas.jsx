@@ -165,9 +165,12 @@ function parseCSV(texto) {
       // domínio = coluna com ponto, sem espaço, que não seja o CNPJ
       const domCol = cols.find((c) => c !== cnpjCol && /\./.test(c) && !/\s/.test(c) && c.replace(/\D/g, '').length < 11)
       dominio = soHost(domCol)
-      empresa = cols.find((c) => c && c !== cnpjCol && c !== domCol) || cols[0] || ''
+      // nome = coluna que não é o CNPJ nem o domínio E não parece um CNPJ (evita
+      // usar "01.105.558/0001-02" como nome quando só o CNPJ foi colado).
+      empresa = cols.find((c) => c && c !== cnpjCol && c !== domCol && c.replace(/\D/g, '').length < 11) || ''
     }
-    if (empresa) out.push({ empresa, cnpj, dominio })
+    // aceita a linha se tiver ao menos um identificador (nome, CNPJ ou domínio).
+    if (empresa || cnpj || dominio) out.push({ empresa, cnpj, dominio })
   }
   return out
 }
