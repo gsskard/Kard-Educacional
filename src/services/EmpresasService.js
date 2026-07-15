@@ -42,6 +42,29 @@ export class EmpresasService {
     })
   }
 
+  // POST /crm-cobranca/empresa-salvar — cadastra (modo 'novo') ou edita (modo 'editar')
+  // os dados da empresa em rh_enriquecimento. Cadastro cria 1 linha placeholder (manual)
+  // que NÃO conta como contato; a edição atualiza os campos de todas as linhas do CNPJ.
+  salvarEmpresa({ modo, cnpj, empresa, dominio, localizacao, porte }) {
+    return this.api.post('/crm-cobranca/empresa-salvar', {
+      modo: modo === 'editar' ? 'editar' : 'novo',
+      cnpj: String(cnpj || '').replace(/\D/g, ''),
+      empresa: empresa || '',
+      dominio: dominio || '',
+      localizacao: localizacao || '',
+      porte: porte || '',
+    })
+  }
+
+  // POST /crm-cobranca/empresa-ocultar — some/reexibe a empresa na lista (coluna `oculto`).
+  // Não apaga nada: marca todas as linhas do CNPJ. oculto=false desfaz.
+  ocultarEmpresa(cnpj, oculto = true) {
+    return this.api.post('/crm-cobranca/empresa-ocultar', {
+      cnpj: String(cnpj || '').replace(/\D/g, ''),
+      oculto: oculto === true,
+    })
+  }
+
   // GET /crm-cobranca/dominios — GRÁTIS. Domínios candidatos + contagem (Hunter email-count).
   async sugerirDominios(nome) {
     try {

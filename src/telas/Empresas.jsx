@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, salvarEmpresa, ocultarEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import PainelEmpresa from '../componentes/PainelEmpresa'
 import { nomeProprio, formatarCnpj, confiancaDominio } from '../lib/formato'
@@ -126,6 +126,50 @@ function EscolhaDominio({ item, onUsar, onDescartar }) {
         <div className="dom-manual">
           <input placeholder="ex.: empresa.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
           <button className="btn-mini" disabled={!manual.trim()} onClick={() => onUsar(manual.trim())}>usar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Formulário de cadastro/edição manual de empresa (modal). No modo 'novo' o CNPJ é
+// obrigatório (é a chave da lista, agrupada por CNPJ); no 'editar' ele fica fixo.
+// Domínio é opcional — se ficar vazio no cadastro, a tela dispara a descoberta grátis.
+function FormEmpresa({ inicial, salvando, onSalvar, onFechar }) {
+  const ed = inicial.modo === 'editar'
+  const [f, setF] = useState(inicial)
+  const set = (k) => (ev) => setF((s) => ({ ...s, [k]: ev.target.value }))
+  const cnpjDigits = String(f.cnpj || '').replace(/\D/g, '')
+  const podeSalvar = f.empresa.trim() && (ed || cnpjDigits.length === 14)
+  return (
+    <div className="modal-overlay" onClick={onFechar}>
+      <div className="modal-emp" onClick={(e) => e.stopPropagation()}>
+        <h3>{ed ? 'Editar empresa' : 'Adicionar empresa'}</h3>
+        <label className="campo">
+          <span>Empresa *</span>
+          <input value={f.empresa} onChange={set('empresa')} placeholder="Razão social ou nome" autoFocus />
+        </label>
+        <label className="campo">
+          <span>CNPJ {ed ? '(fixo)' : '*'}</span>
+          <input value={f.cnpj} onChange={set('cnpj')} placeholder="00.000.000/0000-00" disabled={ed} />
+          {!ed && cnpjDigits.length > 0 && cnpjDigits.length !== 14 && (
+            <small className="campo-erro">CNPJ precisa ter 14 dígitos.</small>
+          )}
+        </label>
+        <label className="campo">
+          <span>Domínio</span>
+          <input value={f.dominio} onChange={set('dominio')} placeholder="ex.: empresa.com.br (opcional)" />
+        </label>
+        <div className="campo-dupla">
+          <label className="campo"><span>Localização</span><input value={f.localizacao} onChange={set('localizacao')} placeholder="Cidade/UF" /></label>
+          <label className="campo"><span>Porte</span><input value={f.porte} onChange={set('porte')} placeholder="ex.: Grande porte" /></label>
+        </div>
+        {!ed && <small className="ajuda">Sem domínio? A gente descobre grátis (RDAP/Snov) ao salvar.</small>}
+        <div className="modal-acoes">
+          <button className="btn-refresh" onClick={onFechar} disabled={salvando}>cancelar</button>
+          <button className="btn-primario" disabled={!podeSalvar || salvando} onClick={() => onSalvar({ ...f, modo: inicial.modo })}>
+            {salvando ? 'salvando…' : 'salvar'}
+          </button>
         </div>
       </div>
     </div>
@@ -728,6 +772,21 @@ export default function Empresas() {
   const [ordCol, setOrdCol] = useState(null)     // coluna de ordenação (null = ordem do back)
   const [ordDir, setOrdDir] = useState('asc')    // 'asc' | 'desc'
   const [filtroCor, setFiltroCor] = useState('todas') // 'todas' | 'verde' | 'ambar' | 'vermelho'
+  const [formEmp, setFormEmp] = useState(null)   // null | { modo:'novo'|'editar', cnpj, empresa, ... }
+  const [salvandoEmp, setSalvandoEmp] = useState(false)
+  const [desfazer, setDesfazer] = useState(null) // null | { cnpj, nome } — empresa recém-ocultada
+  const [autoLib, setAutoLib] = useState(false)  // rodando o auto-liberar 3 RH (≥60%)
+
+  // Quantos RH ainda dá pra auto-liberar numa empresa: teto de 3 no total, só se
+  // a confiança do domínio ≥60% e ainda há prospects não revelados.
+  const faltaLiberar = (e) => {
+    if (Number(e.dominio_score ?? -1) < 60) return 0
+    const revelados = Number(e.revelados ?? 0)
+    const pendentes = Number(e.total_prospects ?? 0) - revelados
+    const rh = Number(e.total_rh ?? 0)
+    // teto de 3 no total, e só se a empresa tem RH (back revela RH primeiro)
+    return Math.max(0, Math.min(3 - revelados, pendentes, rh))
+  }
 
   const chaveEmp = (e) => e.cnpj || e.empresa || ''
   const corEmp = (e) => confiancaDominio(e.dominio_score).cor  // 'verde' | 'ambar' | 'vermelho'
@@ -774,6 +833,60 @@ export default function Empresas() {
     }
   }
   useEffect(() => { carregar() }, [])
+
+  function abrirNovaEmpresa() {
+    setFormEmp({ modo: 'novo', cnpj: '', empresa: '', dominio: '', localizacao: '', porte: '' })
+  }
+  function editarEmpresa(e) {
+    setFormEmp({ modo: 'editar', cnpj: e.cnpj || '', empresa: e.empresa || '', dominio: e.dominio || '', localizacao: e.localizacao || '', porte: e.porte || '' })
+  }
+
+  // Salva o cadastro/edição. No cadastro sem domínio, dispara a descoberta grátis
+  // (RDAP/Snov) e grava o domínio sugerido — sem gastar crédito de listagem.
+  async function salvarForm(d) {
+    setSalvandoEmp(true); setMsg('')
+    try {
+      await salvarEmpresa(d)
+      if (d.modo === 'novo' && !String(d.dominio || '').trim()) {
+        setMsg(`🔎 Descobrindo domínio de "${d.empresa}"…`)
+        try {
+          const r = await descobrirEmpresa(d.empresa, d.cnpj)
+          const dom = r && (r.dominio_sugerido || (r.ia && r.ia.recomendado))
+          if (dom) await salvarEmpresa({ ...d, modo: 'editar', dominio: dom })
+        } catch { /* descoberta é best-effort; a empresa já foi salva */ }
+      }
+      setFormEmp(null)
+      setMsg('✓ Empresa salva.')
+      await carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    } finally {
+      setSalvandoEmp(false)
+    }
+  }
+
+  // "Excluir" = ocultar (reversível): some da lista na hora e oferece desfazer.
+  async function ocultarEmp(e) {
+    try {
+      await ocultarEmpresa(e.cnpj, true)
+      setRows((prev) => prev.filter((x) => chaveEmp(x) !== chaveEmp(e)))
+      if (empresaAberta === chaveEmp(e)) setEmpresaAberta(null)
+      setDesfazer({ cnpj: e.cnpj, nome: e.empresa })
+      setMsg('')
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    }
+  }
+  async function desfazerOcultar() {
+    if (!desfazer) return
+    try {
+      await ocultarEmpresa(desfazer.cnpj, false)
+      setDesfazer(null)
+      await carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    }
+  }
 
   // 1) só a busca textual (base para as contagens do filtro de cor)
   const porBusca = useMemo(() => {
@@ -867,6 +980,34 @@ export default function Empresas() {
     }
   }
 
+  // PAGO: auto-libera até 3 RH por empresa nas que têm confiança de domínio ≥60%
+  // (pula vermelhos/divergentes) e ainda não chegaram a 3 revelados. Roda em pool
+  // paralelo (a rota de reveal não usa ReceitaWS, então dá pra concorrer).
+  async function autoLiberarRh() {
+    const alvos = rows.map((e) => ({ e, q: faltaLiberar(e) })).filter((x) => x.q > 0 && x.e.cnpj)
+    if (!alvos.length) { setMsg('Nada a liberar: nenhuma empresa ≥60% com RH pendente (teto de 3).'); return }
+    const credEst = alvos.reduce((s, x) => s + x.q, 0)
+    if (!window.confirm(`Auto-liberar RH em ${alvos.length} empresa(s) (domínio ≥60%), até 3 cada.\nAté ~${credEst} crédito(s) Snov (1 por e-mail encontrado). Continuar?`)) return
+    setAutoLib(true); setMsg('')
+    let feitas = 0, falhas = 0
+    const fila = alvos.slice()
+    const LIMITE = 4
+    async function worker() {
+      while (fila.length) {
+        const { e, q } = fila.shift()
+        setMsg(`Liberando RH ${++feitas}/${alvos.length}: ${e.empresa} (até ${q})…`)
+        try { await rhRevelar(e.cnpj, [], 'primeiros_n', q) } catch { falhas++ }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(LIMITE, fila.length) }, worker))
+      setMsg(`Auto-liberação concluída: ${alvos.length} empresa(s)` + (falhas ? `, ${falhas} com falha` : '') + '. Clique em Atualizar em instantes.')
+      carregar()
+    } finally {
+      setAutoLib(false)
+    }
+  }
+
   // reenriquecer força nova busca no Hunter (ignora o cache Redis)
   async function enriquecer(e) {
     try {
@@ -925,13 +1066,30 @@ export default function Empresas() {
 
       {erro && <div className="banner">{erro}</div>}
       {msg && <div className="banner">{msg}</div>}
+      {desfazer && (
+        <div className="banner banner-undo">
+          Empresa <b>{nomeProprio(desfazer.nome)}</b> ocultada da lista.
+          <button className="link-mini" onClick={desfazerOcultar}>desfazer</button>
+          <button className="link-mini link-x" onClick={() => setDesfazer(null)}>×</button>
+        </div>
+      )}
 
       <div className="toolbar">
         <input placeholder="Buscar empresa, CNPJ, domínio ou local..." value={busca} onChange={(e) => setBusca(e.target.value)} />
         <button className="btn-refresh" onClick={carregar}>Atualizar</button>
+        <button className="btn-refresh" onClick={abrirNovaEmpresa}>+ Adicionar</button>
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
+        {(() => {
+          const nAuto = rows.reduce((s, e) => s + (e.cnpj ? Math.min(1, faltaLiberar(e)) : 0), 0)
+          return (
+            <button className="btn-primario btn-liberar-lote" disabled={autoLib || nAuto === 0} onClick={autoLiberarRh}
+              title="Libera até 3 e-mails de RH por empresa com confiança de domínio ≥60% (gasta crédito Snov)">
+              {autoLib ? 'Liberando…' : `🔓 Auto-liberar 3 RH${nAuto ? ` (${nAuto})` : ''}`}
+            </button>
+          )
+        })()}
         <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Exportar Excel" aria-label="Exportar Excel">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" fill="#fff" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -975,6 +1133,7 @@ export default function Empresas() {
                 {thOrd('porte', 'Porte')}
                 {thOrd('contatos', 'Contatos', 'col-cen')}
                 {thOrd('enriquecido', 'Enriquecido em')}
+                <th className="col-cen">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -988,9 +1147,13 @@ export default function Empresas() {
                   <td>{e.porte || '—'}</td>
                   <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
                   <td>{e.enriquecido_em || '—'}</td>
+                  <td className="col-cen col-acoes" onClick={(ev) => ev.stopPropagation()}>
+                    <button className="btn-acao" title="Editar dados da empresa" onClick={() => editarEmpresa(e)}>✏️</button>
+                    <button className="btn-acao btn-acao-del" title="Ocultar empresa da lista (reversível)" onClick={() => ocultarEmp(e)}>🗑️</button>
+                  </td>
                 </tr>
               ))}
-              {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhuma empresa.</td></tr>}
+              {visiveis.length === 0 && <tr><td colSpan={9} className="empty">Nenhuma empresa.</td></tr>}
             </tbody>
           </table>
           <small className="ajuda">Clique numa empresa pra abrir o painel com domínio, contatos e ações (desbloquear e-mail, trocar domínio, reenriquecer).</small>
@@ -1080,6 +1243,9 @@ export default function Empresas() {
           aoFechar={() => setEmpresaAberta(null)}
           aoAtualizar={carregar}
         />
+      )}
+      {formEmp && (
+        <FormEmpresa inicial={formEmp} salvando={salvandoEmp} onSalvar={salvarForm} onFechar={() => { if (!salvandoEmp) setFormEmp(null) }} />
       )}
       </>
       )}
