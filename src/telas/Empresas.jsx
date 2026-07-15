@@ -9,6 +9,11 @@ import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverP
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
 const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people']
 
+// Adicionar/editar/ocultar empresa dependem das rotas empresa-salvar/empresa-ocultar
+// no n8n, que ainda NÃO foram publicadas. Enquanto não existirem, os botões ficam
+// escondidos pra não dar erro de rede. Virar true assim que o backend subir.
+const CRUD_EMPRESA_ATIVO = false
+
 // Chip de confiança do domínio (verificação RDAP): % + bolinha colorida. Vazio =
 // não verificável → vermelho. Reusado nas duas visões de tabela de Empresas.
 function ChipConfianca({ e }) {
@@ -1077,7 +1082,7 @@ export default function Empresas() {
       <div className="toolbar">
         <input placeholder="Buscar empresa, CNPJ, domínio ou local..." value={busca} onChange={(e) => setBusca(e.target.value)} />
         <button className="btn-refresh" onClick={carregar}>Atualizar</button>
-        <button className="btn-refresh" onClick={abrirNovaEmpresa}>+ Adicionar</button>
+        {CRUD_EMPRESA_ATIVO && <button className="btn-refresh" onClick={abrirNovaEmpresa}>+ Adicionar</button>}
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
@@ -1133,7 +1138,7 @@ export default function Empresas() {
                 {thOrd('porte', 'Porte')}
                 {thOrd('contatos', 'Contatos', 'col-cen')}
                 {thOrd('enriquecido', 'Enriquecido em')}
-                <th className="col-cen">Ações</th>
+                {CRUD_EMPRESA_ATIVO && <th className="col-cen">Ações</th>}
               </tr>
             </thead>
             <tbody>
@@ -1147,13 +1152,15 @@ export default function Empresas() {
                   <td>{e.porte || '—'}</td>
                   <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
                   <td>{e.enriquecido_em || '—'}</td>
-                  <td className="col-cen col-acoes" onClick={(ev) => ev.stopPropagation()}>
-                    <button className="btn-acao" title="Editar dados da empresa" onClick={() => editarEmpresa(e)}>✏️</button>
-                    <button className="btn-acao btn-acao-del" title="Ocultar empresa da lista (reversível)" onClick={() => ocultarEmp(e)}>🗑️</button>
-                  </td>
+                  {CRUD_EMPRESA_ATIVO && (
+                    <td className="col-cen col-acoes" onClick={(ev) => ev.stopPropagation()}>
+                      <button className="btn-acao" title="Editar dados da empresa" onClick={() => editarEmpresa(e)}>✏️</button>
+                      <button className="btn-acao btn-acao-del" title="Ocultar empresa da lista (reversível)" onClick={() => ocultarEmp(e)}>🗑️</button>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {visiveis.length === 0 && <tr><td colSpan={9} className="empty">Nenhuma empresa.</td></tr>}
+              {visiveis.length === 0 && <tr><td colSpan={CRUD_EMPRESA_ATIVO ? 9 : 8} className="empty">Nenhuma empresa.</td></tr>}
             </tbody>
           </table>
           <small className="ajuda">Clique numa empresa pra abrir o painel com domínio, contatos e ações (desbloquear e-mail, trocar domínio, reenriquecer).</small>
