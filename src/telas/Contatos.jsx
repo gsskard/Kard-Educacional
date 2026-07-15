@@ -99,7 +99,8 @@ export default function Contatos() {
 
   const visiveis = useMemo(() => {
     // só contatos com e-mail desbloqueado
-    const comEmail = rows.filter((r) => r.email && String(r.email).trim())
+    // sócios (QSA/Receita) sempre aparecem, mesmo sem e-mail próprio
+    const comEmail = rows.filter((r) => r.eh_socio || (r.email && String(r.email).trim()))
     const q = busca.trim().toLowerCase()
     if (!q) return comEmail
     return comEmail.filter((r) =>
@@ -222,7 +223,7 @@ export default function Contatos() {
                   <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
                   <td>
                     <div className="contato-nome">
-                      <strong>{nomeProprio(r.nome) || '—'}</strong>
+                      <strong>{nomeProprio(r.nome) || '—'}{r.eh_socio && <span className="tag-socio-mini">SÓCIO</span>}</strong>
                       {r.cargo && <small className="contato-cargo">{r.cargo}</small>}
                     </div>
                   </td>
@@ -251,7 +252,7 @@ export default function Contatos() {
         const daEmpresa = rows.filter((r) => chave(r.empresa) === k)
         const base = daEmpresa[0] || {}
         // contatos no formato que o painel espera (valido vem do email_status)
-        const derivados = daEmpresa.map((r) => ({ id: r.id, nome: r.nome, cargo: r.cargo, email: r.email, valido: r.email_status, eh_rh: r.eh_rh }))
+        const derivados = daEmpresa.map((r) => ({ id: r.id, nome: r.nome, cargo: r.cargo, email: r.email, valido: r.email_status, eh_rh: r.eh_rh, eh_socio: r.eh_socio }))
         // usa a empresa enriquecida (logo, site, porte...) se existir; senão, monta pelo contato
         const emp = empresaPorNome.get(k)
         const empresaObj = emp

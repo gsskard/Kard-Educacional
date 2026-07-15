@@ -99,7 +99,10 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
     setNovoCargo('')
   }
   function removerCargo(t) { salvarTags(tags.filter((x) => x !== t)) }
-  const contatos = e.rh_contatos || []
+  // Sócios (QSA da Receita, via BrasilAPI) ficam numa seção própria, fora da lista de RH.
+  const todos = e.rh_contatos || []
+  const socios = todos.filter((c) => c.eh_socio)
+  const contatos = todos.filter((c) => !c.eh_socio)
   const totalProspects = e.total_prospects ?? contatos.length
   const totalRh = e.total_rh ?? contatos.filter((c) => c.eh_rh).length
 
@@ -205,6 +208,34 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
           <div className="empresa-linha"><span className="chave">Porte</span><span>{e.porte || '—'}</span></div>
           <div className="empresa-linha"><span className="chave">Capital social</span><span>{e.capital_social || '—'}</span></div>
           <div className="empresa-linha"><span className="chave">Categoria</span><span>{e.categoria || '—'}</span></div>
+          {e.email_receita && (
+            <div className="empresa-linha"><span className="chave">E-mail (Receita)</span><span><a href={`mailto:${e.email_receita}`}>{e.email_receita}</a></span></div>
+          )}
+
+          {socios.length > 0 && (
+            <div className="empresa-rh">
+              <div className="chave">Sócios (Receita Federal): {socios.length}</div>
+              <div className="rh-lista">
+                {socios.map((c, i) => (
+                  <div className="rh-linha socio-linha" key={c.id || 'socio-' + i}>
+                    <span className="rh-info">
+                      <span className="rh-nome">
+                        {nomeProprio(c.nome) || '—'}
+                        <span className="tag-socio-mini">SÓCIO</span>
+                      </span>
+                      <small className="rh-cargo">{c.cargo || 'Sócio'}</small>
+                    </span>
+                    {c.email && (
+                      <span className="rh-email-ok">
+                        <a href={`mailto:${c.email}`}>{c.email}</a>
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <small className="ajuda">Nomes do QSA (BrasilAPI). A Receita não divulga e-mail por sócio — quando mostrado, é o <b>e-mail cadastral da empresa</b>.</small>
+            </div>
+          )}
 
           <div className="empresa-rh">
             <div className="chave">
