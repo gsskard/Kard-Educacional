@@ -893,7 +893,7 @@ export default function Empresas() {
                 <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => setEmpresaAberta(chaveEmp(e))} title="Ver empresa">
                   <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{nomeProprio(e.empresa) || '—'}</span></td>
                   <td>{formatarCnpj(e.cnpj) || '—'}</td>
-                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}</td>
+                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}{e.dominio_confere === true && <span className="dom-tick" title={'CNPJ confere' + (e.razao_titular ? ' · ' + e.razao_titular : '')}>✓</span>}{e.dominio_confere === false && <span className="dom-warn" title={'titular difere (RDAP): ' + (e.razao_titular || 'sem CNPJ')}>⚠</span>}</td>
                   <td>{e.localizacao || '—'}</td>
                   <td>{e.porte || '—'}</td>
                   <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
@@ -935,7 +935,7 @@ export default function Empresas() {
                     <td>{formatarCnpj(e.cnpj) || '—'}</td>
                     <td>{e.localizacao || '—'}</td>
                     <td>{e.porte || '—'}</td>
-                    <td>{e.dominio || '—'}</td>
+                    <td>{e.dominio || '—'}{e.dominio_confere === true && <span className="dom-tick" title={'CNPJ confere' + (e.razao_titular ? ' · ' + e.razao_titular : '')}>✓</span>}{e.dominio_confere === false && <span className="dom-warn" title={'titular difere (RDAP): ' + (e.razao_titular || 'sem CNPJ')}>⚠</span>}</td>
                   </>
                 )
                 if (contatos.length === 0) {

@@ -173,9 +173,24 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
             <span className="dom-linha">
               {e.dominio || '—'}
               {e.dominio_count != null && <small className="dom-count">· {e.dominio_count} e-mail(s)</small>}
+              {e.dominio_confere === true && (
+                <small className="dom-confere" title={e.razao_titular ? 'Titular do domínio (RDAP): ' + e.razao_titular : 'CNPJ do titular do domínio confere com o CNPJ da empresa'}>CNPJ confere ✓</small>
+              )}
+              {e.dominio_confere === false && (
+                <small className="dom-difere" title={'Titular do domínio (RDAP): ' + (e.razao_titular || '—') + (e.cnpj_titular ? ' · CNPJ ' + e.cnpj_titular : ' · sem CNPJ')}>titular difere</small>
+              )}
               <button className="link-mini" onClick={() => setPicker((v) => !v)}>trocar</button>
             </span>
           </div>
+          {e.razao_titular && (
+            <div className="empresa-linha">
+              <span className="chave">Titular do domínio</span>
+              <span className="dom-titular">
+                {e.razao_titular}
+                {e.rdap_verificado_em && <small> · RDAP {e.rdap_verificado_em}</small>}
+              </span>
+            </div>
+          )}
           {picker && (
             <TrocaDominio
               empresa={e}
