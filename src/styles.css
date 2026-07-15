@@ -723,3 +723,23 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
   border-radius: 10px; padding: 9px 18px; font-weight: 700; cursor: pointer; }
 .btn-primario:hover { background: var(--verde-600); }
 .btn-primario:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Selo "escolhido pelo robô" (domínio decidido pela descoberta automática) */
+.selo-robo { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px;
+  padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; white-space: nowrap; }
+
+/* Aba Descoberta rápida (IA + Snov) */
+.descoberta-rapida { display: flex; flex-direction: column; gap: 12px; }
+.descoberta-rapida .lote-entrada { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arquivo-btn { cursor: pointer; }
+.lote-barra-acoes { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.chk-autolib { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--texto); cursor: pointer; }
+.dr-prog { display: flex; align-items: center; gap: 10px; }
+.dr-prog .barra { flex: 1; }
+.dr-msg { margin: 0; }
+.dr-score { color: var(--muted); font-size: 12px; }
+.dr-tabela { width: 100%; }
+@media (prefers-color-scheme: dark) {
+  .selo-robo { background: #1e1b4b; color: #a5b4fc; border-color: #3730a3; }
+}
