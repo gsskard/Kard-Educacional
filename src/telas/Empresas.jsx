@@ -71,7 +71,10 @@ function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
 function EscolhaDominio({ item, onUsar, onDescartar }) {
   const [manual, setManual] = useState('')
   const rec = (item.ia && item.ia.recomendado) || item.dominio_sugerido || ''
-  const cands = (item.candidatos || []).slice().sort((a, b) => (b.emails || 0) - (a.emails || 0))
+  // Ordena pela confiança (score 0-100 vindo do back: casa CNPJ via RDAP > nome >
+  // domínio oficial > e-mails). Empate → mais e-mails públicos.
+  const cands = (item.candidatos || []).slice()
+    .sort((a, b) => (b.score || 0) - (a.score || 0) || (b.emails || 0) - (a.emails || 0))
   return (
     <div className="pendente-emp">
       <div className="pendente-topo">
@@ -86,13 +89,23 @@ function EscolhaDominio({ item, onUsar, onDescartar }) {
       <div className="ajuda">Escolha o domínio certo — só então listamos o RH (<b>gasta crédito</b>).</div>
       <div className="dominio-picker">
         {cands.length > 0 ? cands.map((c) => (
-          <div key={c.domain} className={'dom-cand' + (c.domain === rec ? ' recomendado' : '')}>
+          <div key={c.domain} className={'dom-cand' + (c.domain === rec ? ' recomendado' : '') + (c.match_cnpj ? ' confere' : '')}>
             <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
-            <span className="dom-nome">
-              {c.domain}{c.oficial ? ' ★' : ''}
-              {c.domain === rec && <span className="dom-ia">IA sugere</span>}
-            </span>
-            <small>{c.emails ?? 0} e-mail(s)</small>
+            <div className="dom-info">
+              <span className="dom-nome">
+                {c.domain}{c.oficial ? ' ★' : ''}
+                {c.domain === rec && <span className="dom-ia">IA sugere</span>}
+                {c.match_cnpj && <span className="dom-confere" title="O CNPJ do titular do domínio (WHOIS/RDAP) bate com o CNPJ da empresa">CNPJ confere ✓</span>}
+              </span>
+              {c.razao_rdap && <small className="dom-razao">titular: {nomeProprio(c.razao_rdap)}</small>}
+            </div>
+            {typeof c.score === 'number' && (
+              <div className="dom-conf" title={`confiança ${c.score}%`}>
+                <div className="barra"><div className="barra-fill" style={{ width: Math.max(0, Math.min(100, c.score)) + '%' }} /></div>
+                <small>{c.score}%</small>
+              </div>
+            )}
+            <small className="dom-emails">{c.emails ?? 0} e-mail(s)</small>
             <button className="btn-mini" onClick={() => onUsar(c.domain)}>usar</button>
           </div>
         )) : <div className="ajuda">Sem candidatos — digite o domínio abaixo.</div>}

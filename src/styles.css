@@ -506,6 +506,19 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .dom-ia { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 700; color: #fff;
   background: var(--verde-600); border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
 
+/* candidato com nome + razão social do titular (RDAP) empilhados */
+.dom-cand .dom-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dom-cand .dom-info .dom-nome { flex: none; display: flex; align-items: center; gap: 6px; }
+.dom-razao { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* barra de confiança (score 0-100 do back) */
+.dom-conf { flex: none; display: flex; align-items: center; gap: 6px; width: 92px; }
+.dom-conf .barra { flex: 1; }
+.dom-conf small { min-width: 30px; text-align: right; }
+/* CNPJ do titular do domínio (RDAP) confere com o CNPJ da empresa → sinal forte */
+.dom-confere { display: inline-block; font-size: 10px; font-weight: 700; color: #fff;
+  background: #2563eb; border-radius: 999px; padding: 1px 7px; }
+.dom-cand.confere { border-color: #2563eb; background: #eff6ff; }
+
 /* Fase "Confirmar domínio" do lote (empresas incertas) */
 .confirmar-dominio { margin-top: 20px; padding: 16px 18px; border: 1px solid #fde68a;
   background: #fffbeb; border-radius: 12px; }
