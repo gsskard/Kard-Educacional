@@ -19,9 +19,11 @@ export function nomeProprio(valor) {
     .join(' ')
 }
 
-// "40082376000107" -> "40.082.376/0001-07". Se não tiver 14 dígitos, devolve como veio.
+// "40082376000107" -> "40.082.376/0001-07". Se não tiver 14 dígitos (ex.: empresa
+// sem CNPJ, cuja chave interna é o domínio), devolve vazio — quem chama decide o
+// texto ("sem CNPJ" / "—"). Assim não vaza o domínio no lugar do número.
 export function formatarCnpj(valor) {
   const d = String(valor || '').replace(/\D/g, '')
-  if (d.length !== 14) return String(valor || '')
+  if (d.length !== 14) return ''
   return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3.$4-$5')
 }

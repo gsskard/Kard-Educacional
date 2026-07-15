@@ -78,7 +78,7 @@ function EscolhaDominio({ item, onUsar, onDescartar }) {
         <CompanyLogo dominio={rec} nome={item.empresa} size={28} />
         <div className="pendente-nome">
           <strong>{nomeProprio(item.empresa)}</strong>
-          <small>{item.cnpj ? formatarCnpj(item.cnpj) : 'sem CNPJ'}</small>
+          <small>{formatarCnpj(item.cnpj) || 'sem CNPJ'}</small>
         </div>
         <button className="btn-mini" onClick={onDescartar}>descartar</button>
       </div>
@@ -912,11 +912,11 @@ export default function Empresas() {
                 // e-mail liberado. Sem o toggle, mostra só os que já têm e-mail.
                 const todos = e.rh_contatos || []
                 const contatos = mostrarSemEmail ? todos : todos.filter((c) => c.email)
-                const cnpj = e.cnpj || '—'
+                const cnpj = e.cnpj || e.empresa || ''   // chave estável p/ React key
                 const cabec = () => (
                   <>
                     <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={22} />{nomeProprio(e.empresa) || '—'}</span></td>
-                    <td>{formatarCnpj(cnpj)}</td>
+                    <td>{formatarCnpj(e.cnpj) || '—'}</td>
                     <td>{e.localizacao || '—'}</td>
                     <td>{e.porte || '—'}</td>
                     <td>{e.dominio || '—'}</td>

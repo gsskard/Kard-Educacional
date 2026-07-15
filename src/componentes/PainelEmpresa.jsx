@@ -154,7 +154,7 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
           <CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={44} />
           <div className="painel-titulo">
             <strong>{nomeProprio(e.empresa) || '—'}</strong>
-            {e.cnpj && <small>{formatarCnpj(e.cnpj)}</small>}
+            {formatarCnpj(e.cnpj) && <small>{formatarCnpj(e.cnpj)}</small>}
           </div>
           <button
             className="painel-fechar"
