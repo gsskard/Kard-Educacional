@@ -271,7 +271,7 @@ function DescobertaRapida({ onEnriquecido, irParaEmpresas }) {
   const [msg, setMsg] = useState('')
   const [prog, setProg] = useState({ n: 0, total: 0 })
   const [autoLib, setAutoLib] = useState(true)  // auto-liberar 3 RH (≥60%) ao final
-  const CONC = 5                                // consultas paralelas (sem ReceitaWS)
+  const CONC = 3                                // consultas paralelas (sem ReceitaWS). 1 worker n8n → 3 evita saturar
 
   function lerArquivo(ev) {
     const f = ev.target.files && ev.target.files[0]; if (!f) return
