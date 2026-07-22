@@ -87,8 +87,14 @@ export default function ValidacaoIALote() {
           const r = await validarDominioIA(alvo.empresa, alvo.cnpj, `lote-${total}`)
           registrar({ ...alvo, ...r })
         } catch (err) {
-          // guarda o erro no card e segue para a próxima
-          registrar({ ...alvo, score: 0, confianca: 'nenhuma', observacao: 'erro: ' + err.message })
+          const tentativas = (alvo.tentativas || 0) + 1
+          if (tentativas <= 2) {
+            // falha temporária (timeout/sobrecarga): volta pro FIM da fila e tenta de novo
+            filaAtual.push({ ...alvo, tentativas })
+          } else {
+            // 3 falhas seguidas: registra o erro no card e segue
+            registrar({ ...alvo, score: 0, confianca: 'nenhuma', observacao: 'erro: ' + err.message + ' (3 tentativas)' })
+          }
         }
       }
     }
