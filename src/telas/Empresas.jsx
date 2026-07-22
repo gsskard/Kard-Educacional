@@ -1281,6 +1281,7 @@ export default function Empresas() {
         <div className="secao"><div className="empty">Nenhuma empresa enriquecida ainda.</div></div>
       ) : view === 'cards' ? (
         <>
+          <div className="preview-wrap">
           <table className="preview">
             <thead>
               <tr>
@@ -1317,6 +1318,7 @@ export default function Empresas() {
               {visiveis.length === 0 && <tr><td colSpan={CRUD_EMPRESA_ATIVO ? 9 : 8} className="empty">Nenhuma empresa.</td></tr>}
             </tbody>
           </table>
+          </div>
           <small className="ajuda">Clique numa empresa pra abrir o painel com domínio, contatos e ações (desbloquear e-mail, trocar domínio, reenriquecer).</small>
         </>
       ) : (

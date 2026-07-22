@@ -291,6 +291,8 @@ input:focus, select:focus { outline: none; border-color: var(--verde); box-shado
   padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--borda); white-space: nowrap;
 }
 .preview td { padding: 13px 14px; border-bottom: 1px solid var(--borda); white-space: nowrap; color: var(--navy-800); }
+/* nome da empresa não estica a coluna: corta com … (o painel mostra o nome completo) */
+.preview td:first-child { max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
 .preview tbody tr:hover { background: #fafbfe; }
 
 /* Selos (pílulas) de status */
@@ -412,7 +414,8 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 /* ===================================================================
    Validação de domínio em lote (aba de Empresas)
    =================================================================== */
-.abas-topo { margin: 4px 0 18px; }
+.abas-topo { margin: 4px 0 18px; display: flex; flex-wrap: wrap; }
+.abas-topo button { flex: 0 1 auto; }
 
 .lote-entrada { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .arquivo-label { display: inline-flex; align-items: center; }
