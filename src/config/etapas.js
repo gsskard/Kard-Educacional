@@ -20,8 +20,10 @@ export const COLUNAS_COBRANCA = [
 
 // Formato do arquivo Educacional (Anexo B — ainda não fornecido, [A VALIDAR]).
 // Placeholder mínimo até recebermos o arquivo-exemplo do Educacional.
+// `cnpj` + `email` são obrigatórios: são a chave do cruzamento com a base
+// prospectada (mail merge por lista — só quem casa recebe e-mail).
 export const COLUNAS_EDUCACIONAL = [
-  'nome', 'email', 'empresa', 'valor', 'vencimento',
+  'nome', 'email', 'cnpj', 'empresa', 'valor', 'vencimento',
 ]
 
 export const ETAPAS = {

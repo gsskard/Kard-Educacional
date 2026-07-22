@@ -8,22 +8,69 @@ export class EmpresasService {
     this.api = cliente
   }
 
-  // GET /crm-cobranca/empresas — empresas enriquecidas (emails_rh já parseado no modelo).
+  // GET /crm-cobranca/rh-empresas — empresas enriquecidas (agregado por CNPJ da
+  // tabela rh_enriquecimento do módulo Snov). emails_rh traz só os já revelados.
   async listarEmpresas() {
-    const data = await this.api.get('/crm-cobranca/empresas')
+    const data = await this.api.get('/crm-cobranca/rh-empresas')
     const lista = Array.isArray(data) ? data : (data?.data || [])
     return lista.map(Empresa.fromJson)
   }
 
-  // POST /crm-cobranca/enriquecer — PAGA (cota Hunter). forcar=true ignora o cache Redis;
-  // dominio manda a busca por domínio (evita chute errado).
-  enriquecerEmpresa(empresa, cnpj, forcar, dominio) {
-    return this.api.post('/crm-cobranca/enriquecer', {
+  // POST /crm-cobranca/rh-preview — GRÁTIS (0 créditos Snov). Descobre o domínio
+  // (BrasilAPI/Receita + contagem Snov) e salva os prospects sem e-mail.
+  // forcar=true ignora o cache; dominio manda a busca por domínio (evita chute errado).
+  enriquecerEmpresa(empresa, cnpj, forcar, dominio, cargosAlvo) {
+    return this.api.post('/crm-cobranca/rh-preview', {
       empresa,
       cnpj,
       forcar: forcar === true,
       dominio: dominio || undefined,
+      cargos_alvo: cargosAlvo && cargosAlvo.length ? cargosAlvo : undefined,
     })
+  }
+
+  // POST /crm-cobranca/rh-preview com so_descobrir=true — GRÁTIS (0 crédito Snov).
+  // Fase 1: só descobre o domínio (Receita + contagem Snov) e devolve candidatos +
+  // confiança (alta/baixa) + recomendação da IA — NÃO lista o RH (não gasta crédito).
+  // Responde { cnpj, empresa, dominio_sugerido, confianca, dados, candidatos, ia }.
+  async descobrirEmpresa(empresa, cnpj, dominio) {
+    return this.api.post('/crm-cobranca/rh-preview', {
+      empresa,
+      cnpj,
+      dominio: dominio || undefined,
+      so_descobrir: true,
+    })
+  }
+
+  // POST /crm-cobranca/empresa-salvar — cadastra (modo 'novo') ou edita (modo 'editar')
+  // os dados da empresa em rh_enriquecimento. Cadastro cria 1 linha placeholder (manual)
+  // que NÃO conta como contato; a edição atualiza os campos de todas as linhas do CNPJ.
+  salvarEmpresa({ modo, cnpj, empresa, dominio, localizacao, porte }) {
+    return this.api.post('/crm-cobranca/empresa-salvar', {
+      modo: modo === 'editar' ? 'editar' : 'novo',
+      cnpj: String(cnpj || '').replace(/\D/g, ''),
+      empresa: empresa || '',
+      dominio: dominio || '',
+      localizacao: localizacao || '',
+      porte: porte || '',
+    })
+  }
+
+  // POST /crm-cobranca/empresa-ocultar — some/reexibe a empresa na lista (coluna `oculto`).
+  // Não apaga nada: marca todas as linhas do CNPJ. oculto=false desfaz.
+  ocultarEmpresa(cnpj, oculto = true) {
+    return this.api.post('/crm-cobranca/empresa-ocultar', {
+      cnpj: String(cnpj || '').replace(/\D/g, ''),
+      oculto: oculto === true,
+    })
+  }
+
+  // POST /crm-cobranca/rh-descobrir-rapido — descoberta RÁPIDA (pula ReceitaWS, então
+  // dá pra rodar em paralelo). Robô acha o domínio (Snov máx 3 + RDAP + IA) e já lista
+  // o RH (sem revelar e-mail = grátis). Responde a lista de prospects; o domínio
+  // escolhido/score/selo-robô ficam salvos e aparecem no GET rh-empresas.
+  async descobrirRapido(empresa, cnpj) {
+    return this.api.post('/crm-cobranca/rh-descobrir-rapido', { empresa, cnpj: cnpj || undefined })
   }
 
   // GET /crm-cobranca/dominios — GRÁTIS. Domínios candidatos + contagem (Hunter email-count).

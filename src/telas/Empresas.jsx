@@ -1,39 +1,190 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes } from '../api/n8n'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, descobrirRapido, salvarEmpresa, ocultarEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
+<<<<<<< HEAD
 import ValidacaoIALote from '../componentes/ValidacaoIALote'
+=======
+import PainelEmpresa from '../componentes/PainelEmpresa'
+import { nomeProprio, formatarCnpj, confiancaDominio, faltaLiberarRh } from '../lib/formato'
+import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverPendente, descartarPendente } from '../lib/loteJob'
+>>>>>>> 2f8ca42448a6d176531f1d492a88c36f641b757b
 
-// Seletor de domínio: mostra sugestões (Clearbit) + campo manual, pra o usuário
-// escolher o domínio certo quando o nome é ambíguo (ex.: Kard, O Boticário).
-function DomainPicker({ nome, onEscolher, onFechar }) {
-  const [sug, setSug] = useState([])
+// Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
+// Mostramos como hashtags no card pra deixar claro que contatos buscamos.
+const CARGOS_ALVO = ['rh', 'recursos humanos', 'talent', 'recrutamento', 'people']
+
+// Adicionar/editar/ocultar empresa usam as rotas empresa-salvar/empresa-ocultar do n8n.
+const CRUD_EMPRESA_ATIVO = true
+
+// Chip de confiança do domínio (verificação RDAP): % + bolinha colorida. Vazio =
+// não verificável → vermelho. Reusado nas duas visões de tabela de Empresas.
+// Selo "escolhido pelo robô": aparece quando o domínio foi decidido automaticamente
+// pela descoberta (IA + Snov + RDAP), sem o usuário ter forçado. Some se foi manual.
+function SeloRobo({ e }) {
+  if (!e || !(e.dominio_por_robo === true || e.dominio_por_robo === 't')) return null
+  return <span className="selo-robo" title="Domínio escolhido automaticamente pelo robô (IA + Snov + RDAP). Você pode trocar se estiver errado.">🤖 robô</span>
+}
+
+function ChipConfianca({ e }) {
+  const cf = confiancaDominio(e.dominio_score)
+  const tt = 'Confiança do domínio (RDAP): ' + (cf.pct != null ? cf.pct + '% · ' : '') + cf.txt
+    + (e.razao_titular ? ' · titular: ' + e.razao_titular : '')
+    + (e.cnpj_titular ? ' · CNPJ ' + e.cnpj_titular : '')
+  return (
+    <span className={'conf-chip conf-' + cf.cor} title={tt}>
+      <i className="conf-dot" />{cf.pct != null ? cf.pct + '%' : '—'}
+    </span>
+  )
+}
+
+// Painel de troca de domínio: lista os domínios que a IA/Snov acharam com a
+// contagem de e-mails públicos (grátis) + campo manual. Clicar em "enriquecer"
+// re-busca os contatos de RH por aquele domínio — aí sim gasta crédito Snov.
+function TrocaDominio({ empresa, onEnriquecer, onFechar }) {
   const [manual, setManual] = useState('')
-  const [carregando, setCarregando] = useState(true)
+  const [live, setLive] = useState(null)   // null = buscando; [] = sem sugestões
   useEffect(() => {
     let ativo = true
-    sugerirDominios(nome).then((s) => { if (ativo) { setSug(s); setCarregando(false) } })
+    sugerirDominios(empresa.empresa).then((s) => { if (ativo) setLive(s || []) })
     return () => { ativo = false }
-  }, [nome])
+  }, [empresa.empresa])
+
+  // Junta os candidatos salvos (Snov, com ★ oficial) com as sugestões ao vivo
+  // (Hunter), sem duplicar domínio, e ordena por quantidade de e-mails.
+  const mapa = new Map()
+  for (const c of (empresa.candidatos || [])) {
+    mapa.set(c.domain, { domain: c.domain, count: c.emails ?? 0, oficial: c.oficial === true })
+  }
+  for (const s of (live || [])) {
+    const ex = mapa.get(s.domain)
+    if (ex) { if (ex.count == null) ex.count = s.total }
+    else mapa.set(s.domain, { domain: s.domain, count: s.total ?? 0, oficial: false })
+  }
+  // Mostra todos os candidatos (mesmo os de 0 e-mail), ordenados por quantidade.
+  const cands = [...mapa.values()].sort((a, b) => (b.count || 0) - (a.count || 0))
+  const carregando = live === null
+
   return (
     <div className="dominio-picker">
-      <div className="ajuda">Qual o domínio correto de <b>{nome}</b>?</div>
+      <div className="ajuda">
+        Domínios de <b>{empresa.empresa}</b> — o número é de e-mails públicos (grátis).
+        <b> Enriquecer</b> busca os contatos de RH na Snov e <b>gasta crédito</b>.
+      </div>
       {carregando ? (
-        <div className="ajuda">buscando sugestões…</div>
-      ) : sug.length > 0 ? (
-        sug.map((s) => (
-          <button key={s.domain} className="dom-opcao" onClick={() => onEscolher(s.domain)}>
-            <CompanyLogo dominio={s.domain} nome={s.domain} size={20} />
-            <span className="dom-nome">{s.domain}</span>
-            <small>{s.total} e-mail(s)</small>
-          </button>
+        <div className="ajuda">buscando domínios…</div>
+      ) : cands.length > 0 ? (
+        cands.map((c) => (
+          <div key={c.domain} className={'dom-cand' + (c.domain === empresa.dominio ? ' atual' : '')}>
+            <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
+            <span className="dom-nome">{c.domain}{c.oficial ? ' ★' : ''}</span>
+            <small>{c.count ?? 0} e-mail(s)</small>
+            <button className="btn-mini" onClick={() => onEnriquecer(c.domain)}>enriquecer</button>
+          </div>
         ))
       ) : (
-        <div className="ajuda">Sem sugestões — digite o domínio abaixo.</div>
+        <div className="ajuda">Sem candidatos — digite o domínio abaixo e clique em usar.</div>
       )}
       <div className="dom-manual">
         <input placeholder="ex.: kard.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
-        <button className="btn-mini" disabled={!manual.trim()} onClick={() => onEscolher(manual.trim())}>usar</button>
+        <button className="btn-mini" disabled={!manual.trim()} onClick={() => onEnriquecer(manual.trim())}>usar</button>
         <button className="btn-mini" onClick={onFechar}>fechar</button>
+      </div>
+    </div>
+  )
+}
+
+// Escolha de domínio de uma empresa INCERTA (fase de confirmação do lote).
+// Mostra os candidatos da descoberta (grátis) + a sugestão da IA em destaque.
+// Clicar em "usar" lista o RH daquele domínio (aí sim gasta crédito).
+function EscolhaDominio({ item, onUsar, onDescartar }) {
+  const [manual, setManual] = useState('')
+  const rec = (item.ia && item.ia.recomendado) || item.dominio_sugerido || ''
+  // Ordena pela confiança (score 0-100 vindo do back: casa CNPJ via RDAP > nome >
+  // domínio oficial > e-mails). Empate → mais e-mails públicos.
+  const cands = (item.candidatos || []).slice()
+    .sort((a, b) => (b.score || 0) - (a.score || 0) || (b.emails || 0) - (a.emails || 0))
+  return (
+    <div className="pendente-emp">
+      <div className="pendente-topo">
+        <CompanyLogo dominio={rec} nome={item.empresa} size={28} />
+        <div className="pendente-nome">
+          <strong>{nomeProprio(item.empresa)}</strong>
+          <small>{formatarCnpj(item.cnpj) || 'sem CNPJ'}</small>
+        </div>
+        <button className="btn-mini" onClick={onDescartar}>descartar</button>
+      </div>
+      {item.ia && item.ia.motivo && <div className="pendente-ia">🤖 IA: {item.ia.motivo}</div>}
+      <div className="ajuda">Escolha o domínio certo — só então listamos o RH (<b>gasta crédito</b>).</div>
+      <div className="dominio-picker">
+        {cands.length > 0 ? cands.map((c) => (
+          <div key={c.domain} className={'dom-cand' + (c.domain === rec ? ' recomendado' : '') + (c.match_cnpj ? ' confere' : '')}>
+            <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
+            <div className="dom-info">
+              <span className="dom-nome">
+                {c.domain}{c.oficial ? ' ★' : ''}
+                {c.domain === rec && <span className="dom-ia">IA sugere</span>}
+                {c.match_cnpj && <span className="dom-confere" title="O CNPJ do titular do domínio (WHOIS/RDAP) bate com o CNPJ da empresa">CNPJ confere ✓</span>}
+              </span>
+              {c.razao_rdap && <small className="dom-razao">titular: {nomeProprio(c.razao_rdap)}</small>}
+            </div>
+            {typeof c.score === 'number' && (
+              <div className="dom-conf" title={`confiança ${c.score}%`}>
+                <div className="barra"><div className="barra-fill" style={{ width: Math.max(0, Math.min(100, c.score)) + '%' }} /></div>
+                <small>{c.score}%</small>
+              </div>
+            )}
+            <small className="dom-emails">{c.emails ?? 0} e-mail(s)</small>
+            <button className="btn-mini" onClick={() => onUsar(c.domain)}>usar</button>
+          </div>
+        )) : <div className="ajuda">Sem candidatos — digite o domínio abaixo.</div>}
+        <div className="dom-manual">
+          <input placeholder="ex.: empresa.com.br" value={manual} onChange={(e) => setManual(e.target.value)} />
+          <button className="btn-mini" disabled={!manual.trim()} onClick={() => onUsar(manual.trim())}>usar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Formulário de cadastro/edição manual de empresa (modal). No modo 'novo' o CNPJ é
+// obrigatório (é a chave da lista, agrupada por CNPJ); no 'editar' ele fica fixo.
+// Domínio é opcional — se ficar vazio no cadastro, a tela dispara a descoberta grátis.
+function FormEmpresa({ inicial, salvando, onSalvar, onFechar }) {
+  const ed = inicial.modo === 'editar'
+  const [f, setF] = useState(inicial)
+  const set = (k) => (ev) => setF((s) => ({ ...s, [k]: ev.target.value }))
+  const cnpjDigits = String(f.cnpj || '').replace(/\D/g, '')
+  const podeSalvar = f.empresa.trim() && (ed || cnpjDigits.length === 14)
+  return (
+    <div className="modal-overlay" onClick={onFechar}>
+      <div className="modal-emp" onClick={(e) => e.stopPropagation()}>
+        <h3>{ed ? 'Editar empresa' : 'Adicionar empresa'}</h3>
+        <label className="campo">
+          <span>Empresa *</span>
+          <input value={f.empresa} onChange={set('empresa')} placeholder="Razão social ou nome" autoFocus />
+        </label>
+        <label className="campo">
+          <span>CNPJ {ed ? '(fixo)' : '*'}</span>
+          <input value={f.cnpj} onChange={set('cnpj')} placeholder="00.000.000/0000-00" disabled={ed} />
+          {!ed && cnpjDigits.length > 0 && cnpjDigits.length !== 14 && (
+            <small className="campo-erro">CNPJ precisa ter 14 dígitos.</small>
+          )}
+        </label>
+        <label className="campo">
+          <span>Domínio</span>
+          <input value={f.dominio} onChange={set('dominio')} placeholder="ex.: empresa.com.br (opcional)" />
+        </label>
+        <div className="campo-dupla">
+          <label className="campo"><span>Localização</span><input value={f.localizacao} onChange={set('localizacao')} placeholder="Cidade/UF" /></label>
+          <label className="campo"><span>Porte</span><input value={f.porte} onChange={set('porte')} placeholder="ex.: Grande porte" /></label>
+        </div>
+        {!ed && <small className="ajuda">Sem domínio? A gente descobre grátis (RDAP/Snov) ao salvar.</small>}
+        <div className="modal-acoes">
+          <button className="btn-refresh" onClick={onFechar} disabled={salvando}>cancelar</button>
+          <button className="btn-primario" disabled={!podeSalvar || salvando} onClick={() => onSalvar({ ...f, modo: inicial.modo })}>
+            {salvando ? 'salvando…' : 'salvar'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -55,8 +206,19 @@ function PillEmail({ valido }) {
 // O analista escolhe o certo e clica "enriquecer" só nesse (aí sim gasta cota).
 // -------------------------------------------------------------------------
 
+// Reduz uma URL/site a só o host (tira https://, www e o caminho): a Snov
+// e o rh-preview esperam o domínio "pelado" (ex.: magazineluiza.com.br).
+function soHost(v) {
+  let s = String(v || '').trim().toLowerCase()
+  if (!s) return ''
+  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '')
+  s = s.split('/')[0].split('?')[0].split('#')[0]
+  return s.trim()
+}
+
 // Lê um CSV simples (delimitador , ou ;). Aceita cabeçalho com colunas
-// empresa/nome/razão social e cnpj; sem cabeçalho, adivinha pelas colunas.
+// empresa/nome/razão social, cnpj e — opcional — site/domínio; sem cabeçalho,
+// adivinha pelas colunas (CNPJ pelos dígitos, domínio pelo ponto sem espaço).
 function parseCSV(texto) {
   const linhas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (!linhas.length) return []
@@ -65,59 +227,421 @@ function parseCSV(texto) {
   const norm = (h) => h.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
   const head = split(linhas[0]).map(norm)
   const colsEmp = ['empresa', 'nome', 'razaosocial', 'cliente', 'empregador']
-  const temHeader = head.some((h) => colsEmp.includes(h) || h === 'cnpj')
-  let idxEmp = -1, idxCnpj = -1
+  const colsDom = ['dominio', 'site', 'url', 'website', 'link', 'dominiocorporativo', 'pagina']
+  const temHeader = head.some((h) => colsEmp.includes(h) || h === 'cnpj' || colsDom.includes(h))
+  let idxEmp = -1, idxCnpj = -1, idxDom = -1
   if (temHeader) {
     idxEmp = head.findIndex((h) => colsEmp.includes(h))
     idxCnpj = head.findIndex((h) => h === 'cnpj')
+    idxDom = head.findIndex((h) => colsDom.includes(h))
   }
   const corpo = temHeader ? linhas.slice(1) : linhas
   const out = []
   for (const l of corpo) {
     const cols = split(l)
-    let empresa = '', cnpj = ''
+    let empresa = '', cnpj = '', dominio = ''
     if (temHeader) {
       empresa = idxEmp >= 0 ? (cols[idxEmp] || '') : ''
       cnpj = idxCnpj >= 0 ? (cols[idxCnpj] || '') : ''
+      dominio = idxDom >= 0 ? soHost(cols[idxDom]) : ''
     } else {
       const cnpjCol = cols.find((c) => c.replace(/\D/g, '').length >= 11)
       cnpj = cnpjCol || ''
-      empresa = cols.find((c) => c && c !== cnpjCol) || cols[0] || ''
+      // domínio = coluna com ponto, sem espaço, que não seja o CNPJ
+      const domCol = cols.find((c) => c !== cnpjCol && /\./.test(c) && !/\s/.test(c) && c.replace(/\D/g, '').length < 11)
+      dominio = soHost(domCol)
+      // nome = coluna que não é o CNPJ nem o domínio E não parece um CNPJ (evita
+      // usar "01.105.558/0001-02" como nome quando só o CNPJ foi colado).
+      empresa = cols.find((c) => c && c !== cnpjCol && c !== domCol && c.replace(/\D/g, '').length < 11) || ''
     }
-    if (empresa) out.push({ empresa, cnpj })
+    // aceita a linha se tiver ao menos um identificador (nome, CNPJ ou domínio).
+    if (empresa || cnpj || dominio) out.push({ empresa, cnpj, dominio })
   }
   return out
 }
 
-// Barra de probabilidade colorida (verde alto, âmbar médio, vermelho baixo)
-function ProbBar({ valor }) {
-  const p = Math.max(0, Math.min(100, Number(valor) || 0))
-  const cor = p >= 70 ? 'var(--verde)' : p >= 40 ? 'var(--ambar)' : 'var(--vermelho)'
+// Descoberta rápida (IA + Snov): pula a validação da ReceitaWS (o gargalo de 3/min),
+// então roda em PARALELO. Para cada empresa o robô acha o domínio (Snov máx 3 + RDAP + IA)
+// e já lista o RH (grátis). No fim, auto-libera até 3 RH das empresas ≥60% (pago).
+// Não mexe no fluxo do time (rota separada rh-descobrir-rapido).
+function DescobertaRapida({ onEnriquecido, irParaEmpresas }) {
+  const [texto, setTexto] = useState('')
+  const [arquivo, setArquivo] = useState('')
+  const [entrada, setEntrada] = useState([])
+  const [rodando, setRodando] = useState(false)
+  const [res, setRes] = useState([])            // [{empresa,cnpj,status,rh,dominio,score,robo,msg}]
+  const [msg, setMsg] = useState('')
+  const [prog, setProg] = useState({ n: 0, total: 0 })
+  const [autoLib, setAutoLib] = useState(true)  // auto-liberar 3 RH (≥60%) ao final
+  const CONC = 3                                // consultas paralelas (sem ReceitaWS). 1 worker n8n → 3 evita saturar
+
+  function lerArquivo(ev) {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return
+    setArquivo(f.name)
+    const leitor = new FileReader()
+    leitor.onload = () => { setEntrada(parseCSV(String(leitor.result || ''))); setTexto('') }
+    leitor.readAsText(f)
+  }
+
+  const digits = (s) => String(s || '').replace(/\D/g, '')
+
+  // Após listar tudo, revela até 3 RH das empresas ≥60% (lê os scores atualizados do banco).
+  async function autoLiberarPos(processadas) {
+    try {
+      setMsg('Verificando confiança para auto-liberar RH (≥60%)…')
+      const todas = await listarEmpresas()
+      const alvoCnpjs = new Set(processadas.map((p) => digits(p.cnpj)).filter(Boolean))
+      const alvos = todas
+        .filter((e) => e.cnpj && alvoCnpjs.has(digits(e.cnpj)))
+        .map((e) => ({ e, q: faltaLiberarRh(e) }))
+        .filter((x) => x.q > 0)
+      if (!alvos.length) { setMsg((m) => m + ' — nada elegível p/ auto-liberar (≥60%).'); return }
+      const fila = alvos.slice(); let k = 0
+      const worker = async () => {
+        while (fila.length) {
+          const { e, q } = fila.shift()
+          setMsg(`Liberando RH ${++k}/${alvos.length}: ${e.empresa} (até ${q})…`)
+          try { await rhRevelar(e.cnpj, [], 'primeiros_n', q) } catch { /* segue */ }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(4, fila.length) }, worker))
+      setMsg(`Auto-liberação concluída em ${alvos.length} empresa(s) ≥60%.`)
+      if (onEnriquecido) onEnriquecido()
+    } catch (err) { setMsg('Auto-liberar falhou: ' + err.message) }
+  }
+
+  async function rodar() {
+    if (!entrada.length || rodando) return
+    setRodando(true); setRes([]); setMsg(''); setProg({ n: 0, total: entrada.length })
+    const fila = entrada.map((r, i) => ({ r, i }))
+    const saida = new Array(entrada.length)
+    let done = 0
+    const worker = async () => {
+      while (fila.length) {
+        const { r, i } = fila.shift()
+        try {
+          const d = await descobrirRapido(r.empresa, r.cnpj)
+          const prospects = Array.isArray(d) ? d : ((d && (d.prospects || d.data)) || [])
+          saida[i] = {
+            empresa: r.empresa, cnpj: r.cnpj,
+            status: prospects.length ? 'ok' : 'vazio',
+            rh: prospects.length,
+            dominio: (d && d.dominio) || r.dominio || '',
+            score: d && (d.dominio_score != null ? d.dominio_score : null),
+            robo: !!(d && (d.dominio_por_robo || d.por_robo)),
+          }
+        } catch (err) {
+          saida[i] = { empresa: r.empresa, cnpj: r.cnpj, status: 'erro', msg: err.message }
+        }
+        done++; setProg({ n: done, total: entrada.length })
+        setRes(saida.filter(Boolean).slice())
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONC, fila.length) }, worker))
+    const ok = saida.filter((x) => x && x.status === 'ok').length
+    setMsg(`Descoberta concluída: ${ok} listada(s) de ${entrada.length}.`)
+    if (onEnriquecido) onEnriquecido()
+    if (autoLib) await autoLiberarPos(entrada)
+    setRodando(false)
+  }
+
+  const pct = prog.total ? Math.round((100 * prog.n) / prog.total) : 0
+
   return (
-    <div className="prob">
-      <div className="prob-bar"><span style={{ width: p + '%', background: cor }} /></div>
-      <b style={{ color: cor }}>{p}%</b>
+    <div className="descoberta-rapida">
+      <p className="ajuda lote-intro">
+        <b>Descoberta rápida</b>: cole/suba a lista (nome + CNPJ; site é opcional). O robô acha o
+        domínio por <b>IA + Snov</b> (sem a espera da Receita) e lista o RH — tudo <b>em paralelo</b>,
+        então 400 empresas levam minutos. No fim, <b>libera automaticamente até 3 RH</b> das empresas
+        com confiança de domínio <b>≥60%</b> (gasta crédito Snov só nessas).
+      </p>
+      <div className="lote-entrada">
+        <label className="btn-refresh arquivo-btn">
+          Escolher CSV<input type="file" accept=".csv,text/csv,text/plain" onChange={lerArquivo} hidden />
+        </label>
+        {arquivo && <span className="arquivo-nome">{arquivo}</span>}
+        <span className="lote-ou">ou cole abaixo — uma empresa por linha (empresa;cnpj;site)</span>
+      </div>
+      <textarea
+        className="lote-textarea" rows={5} placeholder={'Magazine Luiza;47.960.950/0001-21\nO Boticário;;\nEmpresa X;;empresax.com.br'}
+        value={texto} disabled={rodando}
+        onChange={(e) => { setTexto(e.target.value); setEntrada(parseCSV(e.target.value)); setArquivo('') }}
+      />
+      <div className="lote-barra-acoes">
+        <label className="chk-autolib" title="Ao terminar, libera até 3 RH por empresa com domínio ≥60%">
+          <input type="checkbox" checked={autoLib} disabled={rodando} onChange={(e) => setAutoLib(e.target.checked)} />
+          auto-liberar 3 RH (≥60%) ao final
+        </label>
+        <button className="btn-primario" onClick={rodar} disabled={!entrada.length || rodando}>
+          {rodando ? 'Rodando…' : `⚡ Rodar descoberta rápida${entrada.length ? ` (${entrada.length})` : ''}`}
+        </button>
+      </div>
+      {(rodando || prog.n > 0) && (
+        <div className="dr-prog">
+          <div className="barra"><div className="barra-fill" style={{ width: pct + '%' }} /></div>
+          <small>{prog.n}/{prog.total}</small>
+        </div>
+      )}
+      {msg && <div className="ajuda dr-msg">{msg}</div>}
+      {res.length > 0 && (
+        <table className="preview dr-tabela">
+          <thead><tr><th>Empresa</th><th>Domínio</th><th className="col-cen">Contatos</th><th className="col-cen">Status</th></tr></thead>
+          <tbody>
+            {res.map((r, i) => (
+              <tr key={(r.cnpj || '') + r.empresa + i}>
+                <td><span className="empresa-cel"><CompanyLogo dominio={r.dominio} nome={r.empresa} size={20} />{nomeProprio(r.empresa) || '—'}</span></td>
+                <td>{r.dominio || '—'}{r.robo && <span className="selo-robo">🤖 robô</span>}{r.score != null && <span className="dr-score"> · {r.score}%</span>}</td>
+                <td className="col-cen">{r.status === 'ok' ? r.rh : '—'}</td>
+                <td className="col-cen">
+                  {r.status === 'ok' ? <span className="pill pill-ok">listado</span>
+                    : r.status === 'vazio' ? <span className="pill pill-neutro">sem RH</span>
+                    : <span className="pill pill-erro" title={r.msg}>erro</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {res.some((r) => r.status === 'ok') && !rodando && (
+        <p className="ajuda">Pronto — os domínios e o selo 🤖 aparecem na aba <b onClick={irParaEmpresas} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Empresas enriquecidas</b> (clique em Atualizar).</p>
+      )}
     </div>
   )
 }
 
-function ValidacaoLote({ onEnriquecido }) {
-  const [entrada, setEntrada] = useState([])       // [{empresa, cnpj}] lido do CSV/texto
+// Validação de domínio em lote
+function ValidacaoLote({ onEnriquecido, irParaEmpresas }) {
+  const [entrada, setEntrada] = useState([])       // [{empresa, cnpj, dominio}] lido do CSV/texto
   const [arquivo, setArquivo] = useState('')
   const [texto, setTexto] = useState('')
+  const [job, setJob] = useState(estadoLote())      // progresso do lote (global, sobrevive à troca de aba)
+  const concluiuRef = useRef(job.concluido)
   const [resultados, setResultados] = useState([]) // linhas da tabela validacoes (candidatos já parseado)
   const [lote, setLote] = useState(null)           // { loteId, total }
   const [msg, setMsg] = useState('')
+  const [rhPorCard, setRhPorCard] = useState({})   // { [key]: { dominio, loading, busy, prospects, sel:Set, msg } }
+  const [dominioSel, setDominioSel] = useState({}) // domínio escolhido por empresa (key -> domínio)
+  const [trocaDom, setTrocaDom] = useState(null)   // key da empresa com o seletor de domínio aberto
+  const [nGlobal, setNGlobal] = useState(3)        // "liberar os primeiros N de cada"
+  const [busca, setBusca] = useState('')           // filtro da planilha (empresa/cargo/nome/e-mail)
+  const [emLoteRh, setEmLoteRh] = useState(false)  // operação de RH em lote em andamento
   const timerRef = useRef(null)
 
-  // Retoma o último lote ao abrir a aba — permite fechar a tela e voltar depois.
+  // Atualiza o estado de RH de um card específico (merge parcial).
+  function setRh(key, patch) {
+    setRhPorCard((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }
+
+  // Junta prospects atualizados (com e-mail/validade) na lista do card, casando por hash.
+  // Só aplica campos preenchidos: uma resposta de revelar traz só o e-mail e uma de
+  // validar só a validade, então não podemos sobrescrever o que já existe com vazio.
+  function mesclarRh(key, atualizados) {
+    setRhPorCard((prev) => {
+      const atual = prev[key] || {}
+      const mapa = new Map((atual.prospects || []).map((p) => [p.hash_revelar, p]))
+      for (const a of atualizados) {
+        const merged = { ...(mapa.get(a.hash_revelar) || {}) }
+        for (const [k, v] of Object.entries(a)) {
+          if (v !== null && v !== undefined && v !== '') merged[k] = v
+        }
+        mapa.set(a.hash_revelar, merged)
+      }
+      return { ...prev, [key]: { ...atual, prospects: [...mapa.values()] } }
+    })
+  }
+
+  // Chave estável por empresa (mesma usada na tabela).
+  const keyOf = (r, i) => (r.cnpj || '') + r.empresa + i
+  // Domínio escolhido para a empresa (default = palpite da IA / 1º candidato).
+  function domEscolhido(r, key) {
+    const cands = r.candidatos || []
+    return dominioSel[key] || r.melhor_dominio || (cands[0] && cands[0].domain) || ''
+  }
+
+  // Resumo global (medidor de crédito): listados/liberados/validados no total e
+  // quantos contatos estão selecionados aguardando liberação (= créditos a gastar).
+  const resumo = useMemo(() => {
+    let listados = 0, liberados = 0, validados = 0, selNaoLib = 0
+    for (const key of Object.keys(rhPorCard)) {
+      const ps = rhPorCard[key].prospects || []
+      const sel = rhPorCard[key].sel || new Set()
+      listados += ps.length
+      for (const p of ps) {
+        if (p.email) liberados++
+        if (p.status_validacao) validados++
+        if (sel.has(p.hash_revelar) && !p.email) selNaoLib++
+      }
+    }
+    return { listados, liberados, validados, selNaoLib }
+  }, [rhPorCard])
+
+  // GRÁTIS: lista o RH de uma empresa pelo domínio escolhido (sem revelar e-mail).
+  async function listarRh(r, key, dominio) {
+    setRh(key, { dominio, loading: true, busy: false, prospects: [], sel: new Set(), msg: '' })
+    try {
+      const lista = await rhPreview(r.empresa, r.cnpj, dominio, [])
+      setRh(key, { loading: false, prospects: lista, msg: lista.length ? '' : 'Nenhum contato de RH neste domínio.' })
+    } catch (err) {
+      setRh(key, { loading: false, msg: '⏳ ' + err.message })
+    }
+  }
+
+  // Troca o domínio da empresa e re-lista o RH (fecha o seletor inline).
+  function mudarDom(r, key, dom) {
+    setDominioSel((prev) => ({ ...prev, [key]: dom }))
+    setTrocaDom(null)
+    listarRh(r, key, dom)
+  }
+
+  // PAGO: revela o e-mail de um único contato (clique no cadeado da planilha).
+  async function liberarUm(r, key, hash) {
+    if (!window.confirm('Liberar este e-mail? Gasta 1 crédito Snov (se encontrado).')) return
+    setRh(key, { busy: true })
+    try { const at = await rhRevelar(r.cnpj, [hash], 'selecionados'); mesclarRh(key, at) }
+    catch (err) { setMsg('⏳ ' + err.message) }
+    finally { setRh(key, { busy: false }) }
+  }
+
+  // GRÁTIS em lote: lista o RH de todas as empresas de uma vez.
+  async function listarTodas() {
+    setEmLoteRh(true); setMsg('Listando RH de todas as empresas (grátis)…')
+    try {
+      for (let i = 0; i < resultados.length; i++) {
+        const r = resultados[i], key = keyOf(r, i), dom = domEscolhido(r, key)
+        if (!dom) continue
+        setMsg(`Listando RH: ${r.empresa}…`)
+        await listarRh(r, key, dom)
+        await new Promise((res) => setTimeout(res, 250))
+      }
+      setMsg('RH listado para todas — nenhum crédito gasto. Selecione e libere só o que precisar.')
+    } finally { setEmLoteRh(false) }
+  }
+
+  // PAGO em lote: libera os primeiros N contatos de cada empresa já listada.
+  async function liberarPrimeirosDeCada() {
+    const qtd = Math.max(1, Number(nGlobal) || 1)
+    const alvos = resultados.map((r, i) => ({ r, key: keyOf(r, i) }))
+      .filter(({ key }) => { const rh = rhPorCard[key]; return rh && (rh.prospects || []).some((p) => !p.email) })
+    if (!alvos.length) { setMsg('Liste o RH primeiro ("Listar RH de todas").'); return }
+    const est = alvos.reduce((acc, { key }) => {
+      const rest = (rhPorCard[key].prospects || []).filter((p) => !p.email).length
+      return acc + Math.min(qtd, rest)
+    }, 0)
+    if (!window.confirm(`Liberar os primeiros ${qtd} de ${alvos.length} empresa(s) ≈ ${est} crédito(s) Snov. Continuar?`)) return
+    setEmLoteRh(true)
+    try {
+      for (const { r, key } of alvos) {
+        setMsg(`Liberando ${r.empresa}…`)
+        try { const at = await rhRevelar(r.cnpj, [], 'primeiros_n', qtd); mesclarRh(key, at) } catch { /* segue */ }
+        await new Promise((res) => setTimeout(res, 350))
+      }
+      setMsg('E-mails liberados.')
+    } finally { setEmLoteRh(false) }
+  }
+
+  // PAGO em lote: libera os contatos selecionados em todas as empresas.
+  async function liberarSelecionadosTodas() {
+    const alvos = resultados.map((r, i) => {
+      const key = keyOf(r, i), rh = rhPorCard[key] || {}, sel = rh.sel || new Set()
+      const hashes = (rh.prospects || []).filter((p) => sel.has(p.hash_revelar) && !p.email).map((p) => p.hash_revelar)
+      return { r, key, hashes }
+    }).filter((x) => x.hashes.length)
+    const totalSel = alvos.reduce((a, x) => a + x.hashes.length, 0)
+    if (!totalSel) { setMsg('Selecione ao menos um contato.'); return }
+    if (!window.confirm(`Liberar ${totalSel} e-mail(s) selecionado(s) ≈ ${totalSel} crédito(s) Snov. Continuar?`)) return
+    setEmLoteRh(true)
+    try {
+      for (const { r, key, hashes } of alvos) {
+        setMsg(`Liberando ${r.empresa}…`)
+        try { const at = await rhRevelar(r.cnpj, hashes, 'selecionados'); mesclarRh(key, at) } catch { /* segue */ }
+        await new Promise((res) => setTimeout(res, 350))
+      }
+      setMsg('Selecionados liberados.')
+    } finally { setEmLoteRh(false) }
+  }
+
+  // PAGO em lote: valida todos os e-mails já liberados.
+  async function validarTodas() {
+    const alvos = resultados.map((r, i) => {
+      const key = keyOf(r, i), rh = rhPorCard[key] || {}
+      const hashes = (rh.prospects || []).filter((p) => p.email).map((p) => p.hash_revelar)
+      return { key, hashes, empresa: r.empresa }
+    }).filter((x) => x.hashes.length)
+    const total = alvos.reduce((a, x) => a + x.hashes.length, 0)
+    if (!total) { setMsg('Nenhum e-mail liberado para validar.'); return }
+    if (!window.confirm(`Validar ${total} e-mail(s) liberado(s)? A validação consome crédito Snov.`)) return
+    setEmLoteRh(true)
+    try {
+      for (const { key, hashes, empresa } of alvos) {
+        setMsg(`Validando ${empresa}…`)
+        try { const at = await rhValidar(hashes); mesclarRh(key, at) } catch { /* segue */ }
+        await new Promise((res) => setTimeout(res, 350))
+      }
+      setMsg('Validação concluída.')
+    } finally { setEmLoteRh(false) }
+  }
+
+  function toggleRhSel(key, hash) {
+    setRhPorCard((prev) => {
+      const c = prev[key] || {}
+      const s = new Set(c.sel || [])
+      s.has(hash) ? s.delete(hash) : s.add(hash)
+      return { ...prev, [key]: { ...c, sel: s } }
+    })
+  }
+
+  // Marca/desmarca TODOS os contatos ainda sem e-mail visíveis na planilha.
+  function alternarTodos(marcar) {
+    setRhPorCard((prev) => {
+      const next = { ...prev }
+      for (const l of linhasPlanilha) {
+        if (l.tipo !== 'contato' || l.p.email) continue
+        const c = next[l.key] || {}
+        const s = new Set(c.sel || [])
+        if (marcar) s.add(l.p.hash_revelar); else s.delete(l.p.hash_revelar)
+        next[l.key] = { ...c, sel: s }
+      }
+      return next
+    })
+  }
+
+  // Monta as linhas da "planilha" a partir dos registros importados (com domínio).
+  // melhor_dominio já vem da planilha; candidatos = só esse domínio (marcado oficial).
+  const semear = (registros) => registros.map((r) => ({
+    empresa: r.empresa,
+    cnpj: r.cnpj,
+    melhor_dominio: r.dominio || '',
+    candidatos: r.dominio ? [{ domain: r.dominio, total: null, oficial: true }] : [],
+  }))
+
+  // Limpa qualquer resquício de lote antigo (o fluxo agora enriquece na hora via rh-preview).
   useEffect(() => {
-    let salvo = null
-    try { salvo = JSON.parse(localStorage.getItem('kard_lote') || 'null') } catch { salvo = null }
-    if (salvo && salvo.loteId) { setLote(salvo); acompanhar(salvo.loteId, salvo.total) }
+    try { localStorage.removeItem('kard_lote') } catch { /* ignora */ }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Assina o job global: o progresso aparece mesmo se a tela foi remontada.
+  useEffect(() => assinarLote(setJob), [])
+
+  // Fases do lote: descobrir (grátis) e listar (gasta crédito). Compartilhado
+  // pelo início do lote e pela resolução de cada empresa incerta (pendente).
+  const fnsLote = useMemo(() => ({
+    descobrir: descobrirEmpresa,
+    listar: (e, c, d) => enriquecerEmpresa(e, c, false, d),
+  }), [])
+
+  // Quando o lote termina, atualiza a lista. Só volta pra aba Empresas se NÃO
+  // sobrou nenhuma empresa aguardando escolha de domínio (senão fica aqui pra resolver).
+  useEffect(() => {
+    if (job.concluido && !concluiuRef.current) {
+      concluiuRef.current = true
+      onEnriquecido && onEnriquecido()
+      if (!job.pendentes.length) irParaEmpresas && irParaEmpresas()
+      limparConcluidoLote()
+    }
+    if (!job.concluido) concluiuRef.current = false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.concluido])
 
   function carregarArquivo(ev) {
     const f = ev.target.files && ev.target.files[0]
@@ -149,24 +673,16 @@ function ValidacaoLote({ onEnriquecido }) {
 
   // Inicia o lote no servidor. Ele processa 1 empresa a cada ~20s (respeita a ReceitaWS 3/min);
   // a tela pode ser fechada — os resultados ficam salvos e reaparecem ao voltar.
-  async function validar() {
-    if (!entrada.length) return
-    const loteId = 'L' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-    setResultados([]); setMsg('')
-    try {
-      const r = await iniciarValidacaoLote(loteId, entrada)
-      const total = (r && r.total) || entrada.length
-      const eta = (r && r.eta_segundos) || total * 20
-      const info = { loteId, total }
-      setLote(info)
-      localStorage.setItem('kard_lote', JSON.stringify(info))
-      const min = Math.max(1, Math.round(eta / 60))
-      setMsg(`Processando ${total} empresa(s) no servidor (~${min} min, cerca de 3/min pela Receita). Você pode fechar esta tela e voltar mais tarde — os resultados vão aparecendo aqui.`)
-      if (timerRef.current) clearTimeout(timerRef.current)
-      acompanhar(loteId, total)
-    } catch (err) {
-      setMsg('⏳ ' + err.message)
-    }
+  // Enriquece cada empresa via rh-preview (GRÁTIS): descobre o domínio (Receita)
+  // quando não veio na planilha, e lista o RH — salvando no rh_enriquecimento.
+  // Empresas COM domínio na planilha pulam a Receita (vão direto na Snov, rápido).
+  // Sem domínio, respeitamos ~3/min da Receita entre as chamadas.
+  function validar() {
+    if (!entrada.length || job.rodando) return
+    setMsg('')
+    // dispara o job global; ele continua rodando mesmo se você trocar de aba/tela.
+    // Fase 1 descobre o domínio (grátis); confiança alta lista sozinho, baixa cai em "Confirmar domínio".
+    iniciarLoteJob(entrada, fnsLote, onEnriquecido)
   }
 
   function novoLote() {
@@ -175,146 +691,225 @@ function ValidacaoLote({ onEnriquecido }) {
     setLote(null); setResultados([]); setMsg(''); setEntrada([]); setTexto(''); setArquivo('')
   }
 
-  // Enriquece de fato o domínio escolhido (gasta cota do Hunter) e joga na aba Empresas.
-  async function usarDominio(r, dominio) {
-    setMsg(`Enriquecendo "${r.empresa}" pelo domínio ${dominio}… aparecerá na aba Empresas em instantes.`)
-    try {
-      await enriquecerEmpresa(r.empresa, r.cnpj, true, dominio)
-      setMsg(`"${r.empresa}" enviada para enriquecimento com ${dominio}. Veja na aba "Empresas enriquecidas".`)
-      if (onEnriquecido) onEnriquecido()
-    } catch (err) {
-      setMsg('⏳ ' + err.message)
-    }
-  }
-
+  // Exporta a planilha: se já há RH listado, baixa os contatos (empresa→e-mail);
+  // senão, baixa a validação de domínios.
   function baixarCSV() {
-    const linhas = [['empresa', 'cnpj', 'melhor_dominio_ia', 'probabilidade', 'justificativa', 'candidatos']]
-    for (const r of resultados) {
-      const cands = (r.candidatos || []).map((c) => `${c.domain}(${c.total})`).join(' | ')
-      linhas.push([
-        r.empresa || '', r.cnpj || '', r.melhor_dominio || '',
-        String(r.probabilidade ?? ''), String(r.justificativa || '').replace(/"/g, "'"), cands,
-      ])
+    const temContatos = Object.values(rhPorCard).some((c) => (c.prospects || []).length)
+    let linhas
+    if (temContatos) {
+      linhas = [['empresa', 'cnpj', 'dominio', 'cargo', 'nome', 'email', 'validacao', 'linkedin']]
+      resultados.forEach((r, i) => {
+        const key = keyOf(r, i), rh = rhPorCard[key], dom = domEscolhido(r, key)
+        for (const p of (rh && rh.prospects) || []) {
+          linhas.push([r.empresa || '', r.cnpj || '', dom, p.cargo || '', p.nome || '', p.email || '', p.status_validacao || '', p.linkedin || ''])
+        }
+      })
+    } else {
+      linhas = [['empresa', 'cnpj', 'melhor_dominio_ia', 'probabilidade', 'justificativa', 'candidatos']]
+      for (const r of resultados) {
+        const cands = (r.candidatos || []).map((c) => `${c.domain}(${c.total})`).join(' | ')
+        linhas.push([r.empresa || '', r.cnpj || '', r.melhor_dominio || '',
+          String(r.probabilidade ?? ''), String(r.justificativa || '').replace(/"/g, "'"), cands])
+      }
     }
     const csv = linhas.map((l) => l.map((c) => `"${String(c)}"`).join(';')).join('\n')
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
-    a.href = url; a.download = 'validacao-dominios.csv'; a.click()
+    a.href = url; a.download = temContatos ? 'rh-contatos.csv' : 'validacao-dominios.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 
   const feitas = resultados.length
   const total = (lote && lote.total) || 0
 
+  // Linhas da planilha: uma por contato, agrupadas por empresa (a célula da
+  // empresa/domínio só aparece na 1ª linha do grupo — visual de células mescladas).
+  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const q = norm(busca)
+  const linhasPlanilha = []
+  resultados.forEach((r, i) => {
+    const key = keyOf(r, i), rh = rhPorCard[key], dom = domEscolhido(r, key)
+    const ps = (rh && rh.prospects) || []
+    if (!rh || rh.loading) {
+      if (!q) linhasPlanilha.push({ tipo: 'empresa', estado: rh && rh.loading ? 'loading' : 'nao-listado', r, key, dom })
+      return
+    }
+    const vis = q ? ps.filter((p) => [p.nome, p.cargo, p.email, r.empresa].some((x) => norm(x).includes(q))) : ps
+    if (!vis.length) { if (!q) linhasPlanilha.push({ tipo: 'empresa', estado: 'sem-rh', r, key, dom }); return }
+    vis.forEach((p, j) => linhasPlanilha.push({ tipo: 'contato', r, key, dom, p, primeira: j === 0, qtdGrupo: vis.length }))
+  })
+  const selecionaveis = linhasPlanilha.filter((l) => l.tipo === 'contato' && !l.p.email)
+  const todosMarcados = selecionaveis.length > 0 &&
+    selecionaveis.every((l) => (rhPorCard[l.key]?.sel || new Set()).has(l.p.hash_revelar))
+
   return (
     <div>
-      <p className="ajuda">
-        Suba um CSV com <b>CNPJ</b> e <b>nome da empresa</b> (colunas <code>empresa</code> e <code>cnpj</code>).
-        O servidor processa <b>~3 empresas por minuto</b> (limite da Receita) e vai salvando os resultados —
-        então <b>pode fechar a tela e voltar depois</b>. Não gasta cota do Hunter; só ao clicar em <b>enriquecer</b> um domínio.
+      <p className="ajuda lote-intro">
+        Suba um CSV (ou cole abaixo) com <b>nome da empresa</b> e <b>CNPJ</b> — e, se tiver, o <b>site/domínio</b>.
+        Ao clicar em <b>Descobrir</b>, achamos o domínio (<b>grátis</b>): se estiver claro, já listamos o RH;
+        se ficar <b>incerto</b>, mostramos os candidatos + sugestão da <b>IA</b> em <b>Confirmar domínio</b> pra você
+        escolher o certo — só então gasta crédito.
       </p>
 
       {msg && <div className="banner">{msg}</div>}
 
-      {!lote ? (
-        <>
-          <div className="lote-entrada">
-            <label className="btn-secundario arquivo-label">
+      {job.rodando ? (
+        <div className="lote-progresso">
+          <div className="lote-prog-topo">
+            <strong>Descobrindo domínio &amp; listando RH…</strong>
+            <span className="lote-prog-n">{job.n}/{job.total}</span>
+          </div>
+          <div className="barra"><div className="barra-fill" style={{ width: job.total ? `${Math.round((job.n / job.total) * 100)}%` : '0%' }} /></div>
+          <div className="ajuda">
+            processando: <b>{nomeProprio(job.nome)}</b>
+            {' '}· pode <b>trocar de aba/tela</b> à vontade que ele continua rodando aqui.
+          </div>
+        </div>
+      ) : (
+        <div className="lote-card">
+          <div className="lote-topo">
+            <label className="arquivo-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
               Escolher CSV
               <input type="file" accept=".csv,text/csv" onChange={carregarArquivo} hidden />
             </label>
             {arquivo && <span className="arquivo-nome">{arquivo}</span>}
-            <span className="ajuda">ou cole abaixo (uma empresa por linha):</span>
+            <span className="lote-ou">ou cole abaixo — uma empresa por linha</span>
           </div>
           <textarea
             className="lote-textarea"
-            placeholder={'empresa;cnpj\nMagazine Luiza;47.960.950/0001-21\nO Boticário;'}
+            placeholder={'empresa;cnpj;site\nMagazine Luiza;47.960.950/0001-21;magazineluiza.com.br\nO Boticário;;boticario.com.br'}
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            rows={4}
+            onChange={(e) => { setTexto(e.target.value); setEntrada(parseCSV(e.target.value)) }}
+            rows={5}
           />
-          <div className="toolbar">
-            <button className="btn-refresh" onClick={carregarTexto} disabled={!texto.trim()}>Ler texto colado</button>
+          <div className="lote-rodape">
+            <span className="ajuda">
+              {entrada.length > 0
+                ? <><b>{entrada.length}</b> empresa(s) lida(s){entrada.filter((r) => r.dominio).length > 0 && <> · {entrada.filter((r) => r.dominio).length} já com domínio</>}</>
+                : 'nenhuma empresa lida ainda'}
+            </span>
             <button className="btn-primario" onClick={validar} disabled={!entrada.length}>
-              {`Validar ${entrada.length || ''} empresa(s)`}
+              {`Descobrir domínio & RH de ${entrada.length || ''} empresa(s)`}
             </button>
           </div>
-        </>
-      ) : (
-        <div className="toolbar">
-          <span className="ajuda">Lote em andamento: <b>{feitas}/{total}</b> concluídas.</span>
-          {feitas > 0 && <button className="btn-refresh" onClick={baixarCSV}>Baixar resultado (CSV)</button>}
-          <button className="btn-refresh" onClick={novoLote}>Novo lote</button>
         </div>
       )}
 
-      {lote && feitas < total && <div className="loading">Aguardando o servidor processar… ({feitas}/{total})</div>}
+      {job.pendentes.length > 0 && (
+        <div className="confirmar-dominio">
+          <h3>Confirmar domínio ({job.pendentes.length})</h3>
+          <p className="ajuda">
+            Estas empresas ficaram <b>incertas</b> na descoberta (sem CNPJ ou sem domínio oficial claro).
+            Escolha o domínio correto pra listar o RH — só aí gasta crédito.
+          </p>
+          {job.pendentes.map((item, i) => (
+            <EscolhaDominio
+              key={(item.cnpj || item.empresa) + '-' + i}
+              item={item}
+              onUsar={(dom) => resolverPendente(item, dom, fnsLote, onEnriquecido)}
+              onDescartar={() => descartarPendente(item)}
+            />
+          ))}
+        </div>
+      )}
 
       {feitas > 0 && (
-        <div className="lote-resultados">
-          {resultados.map((r, i) => {
-            const cands = r.candidatos || []
-            const melhor = r.melhor_dominio || (cands[0] && cands[0].domain) || ''
-            return (
-              <div className="lote-card" key={(r.cnpj || '') + r.empresa + i}>
-                <div className="lote-topo">
-                  <CompanyLogo dominio={melhor} nome={r.empresa} size={44} />
-                  <div className="empresa-id">
-                    <div className="empresa-nome">{r.empresa}</div>
-                    <div className="empresa-cnpj">{r.cnpj || 'CNPJ —'}</div>
-                  </div>
-                  {Number(r.probabilidade) > 0 && (
-                    <div className="lote-ia-resumo">
-                      <small>palpite da IA</small>
-                      <ProbBar valor={r.probabilidade} />
-                    </div>
+        <>
+          {/* Barra de ações em lote */}
+          <div className="rh-barra">
+            <button className="btn-primario" disabled={emLoteRh} onClick={listarTodas}>Listar RH de todas (grátis)</button>
+            <span className="rh-inline">
+              <button className="btn-refresh" disabled={emLoteRh} onClick={liberarPrimeirosDeCada}>Liberar primeiros</button>
+              <input className="rh-n" type="number" min={1} value={nGlobal} onChange={(e) => setNGlobal(e.target.value)} />
+              <span className="ajuda">de cada</span>
+            </span>
+            <input className="rh-filtro" placeholder="buscar (empresa, cargo, nome, e-mail)"
+              value={busca} onChange={(e) => setBusca(e.target.value)} />
+          </div>
+
+          {/* Medidor de crédito — sempre visível */}
+          <div className="rh-meter">
+            <span className="rh-meter-nums">{resumo.listados} listados · <b>{resumo.liberados}</b> liberados · {resumo.validados} validados</span>
+            <span className={'rh-meter-custo' + (resumo.selNaoLib ? ' ativo' : '')}>
+              {resumo.selNaoLib ? `${resumo.selNaoLib} selecionado(s) ≈ ${resumo.selNaoLib} crédito(s)` : 'nenhum selecionado'}
+            </span>
+            <button className="btn-primario" disabled={emLoteRh || !resumo.selNaoLib} onClick={liberarSelecionadosTodas}>🔓 Liberar selecionados</button>
+            <button className="btn-refresh" disabled={emLoteRh || !resumo.liberados} onClick={validarTodas}>✓ Validar liberados</button>
+          </div>
+
+          {resumo.listados === 0 ? (
+            <div className="secao"><div className="empty">
+              Clique em <b>“Listar RH de todas (grátis)”</b> para preencher a planilha com os contatos de RH.
+            </div></div>
+          ) : (
+            <div className="preview-wrap rh-wrap">
+              <table className="preview planilha-rh">
+                <thead>
+                  <tr>
+                    <th className="col-check"><input type="checkbox" checked={todosMarcados} onChange={(e) => alternarTodos(e.target.checked)} /></th>
+                    <th>Empresa</th><th>Cargo</th><th>Contato</th><th>E-mail</th><th>Validade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhasPlanilha.map((l, idx) => {
+                    if (l.tipo === 'empresa') {
+                      return (
+                        <tr className="pl-vazia grupo-inicio" key={l.key + idx}>
+                          <td className="col-check"></td>
+                          <td className="cel-empresa" data-label="Empresa"><span className="empresa-cel"><CompanyLogo dominio={l.dom} nome={l.r.empresa} size={22} />{l.r.empresa}</span></td>
+                          <td colSpan={4} className="ajuda" data-label="RH">
+                            {l.estado === 'loading' ? 'listando RH…' : l.estado === 'sem-rh' ? 'nenhum contato de RH neste domínio' : 'RH ainda não listado'}
+                          </td>
+                        </tr>
+                      )
+                    }
+                    const { r, key, dom, p } = l
+                    const sel = rhPorCard[key]?.sel || new Set()
+                    const cands = r.candidatos || []
+                    return (
+                      <tr className={'pl-contato' + (l.primeira ? ' grupo-inicio' : ' continuacao')} key={key + '-' + (p.hash_revelar || idx)}>
+                        <td className="col-check">
+                          {!p.email && <input type="checkbox" checked={sel.has(p.hash_revelar)} onChange={() => toggleRhSel(key, p.hash_revelar)} />}
+                        </td>
+                        <td className="cel-empresa" data-label="Empresa">
+                          <span className="empresa-cel"><CompanyLogo dominio={dom} nome={r.empresa} size={22} />{r.empresa}</span>
+                          {l.primeira && (
+                            <div className="cel-dom">
+                              {trocaDom === key && cands.length ? (
+                                <select className="dom-select" autoFocus value={dom}
+                                  onChange={(e) => mudarDom(r, key, e.target.value)} onBlur={() => setTrocaDom(null)}>
+                                  {cands.map((c) => <option key={c.domain} value={c.domain}>{c.domain} ({c.total}){c.oficial ? ' ★' : ''}</option>)}
+                                </select>
+                              ) : (
+                                <>{dom || '—'}{cands.length > 1 && <button className="link-mini" onClick={() => setTrocaDom(key)}>trocar</button>}</>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td data-label="Cargo">{p.cargo || '—'}</td>
+                        <td data-label="Contato">
+                          <span className="pl-nome">{p.nome || '—'}</span>
+                          {p.linkedin && <a className="pl-linkedin" href={p.linkedin} target="_blank" rel="noreferrer" title="LinkedIn">in</a>}
+                        </td>
+                        <td className="cel-email" data-label="E-mail">
+                          {p.email
+                            ? <span className="rh-email-val">{p.email}</span>
+                            : <button className="btn-liberar" disabled={rhPorCard[key]?.busy} onClick={() => liberarUm(r, key, p.hash_revelar)}>🔓 liberar</button>}
+                        </td>
+                        <td data-label="Validade">{p.email ? <PillEmail valido={p.status_validacao} /> : <span className="ajuda">—</span>}</td>
+                      </tr>
+                    )
+                  })}
+                  {q && !linhasPlanilha.length && (
+                    <tr><td className="col-check"></td><td colSpan={5} className="ajuda">Nada casa com “{busca}”.</td></tr>
                   )}
-                </div>
-
-                {(r.categoria || r.localizacao) && (
-                  <div className="lote-ctx">
-                    {r.categoria && <span className="ctx-item">{r.categoria}</span>}
-                    {r.localizacao && <span className="ctx-item">📍 {r.localizacao}</span>}
-                  </div>
-                )}
-
-                {r.melhor_dominio && (
-                  <div className="ia-box">
-                    <span className="pill pill-ok">IA: {r.melhor_dominio}</span>
-                    {r.justificativa && <span className="ia-just">{r.justificativa}</span>}
-                  </div>
-                )}
-
-                {cands.length > 0 ? (
-                  <>
-                    <div className="cand-chips">
-                      {cands.map((c) => {
-                        const eMelhor = c.domain === melhor
-                        return (
-                          <button
-                            key={c.domain}
-                            className={'cand-chip' + (eMelhor ? ' melhor' : '')}
-                            title={`Enriquecer ${r.empresa} usando ${c.domain}`}
-                            onClick={() => usarDominio(r, c.domain)}
-                          >
-                            <CompanyLogo dominio={c.domain} nome={c.domain} size={20} />
-                            <span className="dom-nome">{c.domain}</span>
-                            <small>{c.total} e-mail(s)</small>
-                            {c.oficial && <span className="chip-tag oficial" title="domínio do e-mail oficial na Receita">Receita</span>}
-                            {eMelhor && !c.oficial && <span className="chip-tag">★</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div className="ajuda">Clique num domínio para enriquecê-lo e trazer os dados/e-mails de RH para a aba Empresas.</div>
-                  </>
-                ) : (
-                  <div className="ajuda">Ainda sem domínio candidato para este nome.</div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                </tbody>
+              </table>
+            </div>
+          )}
+          <small className="ajuda">Marque contatos e use os botões do topo, ou clique em <b>🔓 liberar</b> numa linha pra soltar só ela. Domínio errado? Clique em “trocar”.</small>
+        </>
       )}
     </div>
   )
@@ -333,9 +928,55 @@ export default function Empresas() {
   const [msg, setMsg] = useState('')
   const [aba, setAba] = useState('empresas')       // 'empresas' | 'lote'
   const [view, setView] = useState('cards')         // 'cards' | 'tabela'
-  const [expandido, setExpandido] = useState(() => new Set())
   const [emLote, setEmLote] = useState(false)
   const [pickerKey, setPickerKey] = useState(null)  // card com o seletor de domínio aberto
+  const [revelando, setRevelando] = useState(new Set()) // ids de RH sendo desbloqueados
+  const [mostrarSemEmail, setMostrarSemEmail] = useState(false) // na Tabela: exibir contatos sem e-mail liberado
+  const [empresaAberta, setEmpresaAberta] = useState(null)      // chave da empresa com o painel lateral aberto
+  const [ordCol, setOrdCol] = useState(null)     // coluna de ordenação (null = ordem do back)
+  const [ordDir, setOrdDir] = useState('asc')    // 'asc' | 'desc'
+  const [filtroCor, setFiltroCor] = useState('todas') // 'todas' | 'verde' | 'ambar' | 'vermelho'
+  const [formEmp, setFormEmp] = useState(null)   // null | { modo:'novo'|'editar', cnpj, empresa, ... }
+  const [salvandoEmp, setSalvandoEmp] = useState(false)
+  const [desfazer, setDesfazer] = useState(null) // null | { cnpj, nome } — empresa recém-ocultada
+  const [autoLib, setAutoLib] = useState(false)  // rodando o auto-liberar 3 RH (≥60%)
+
+  // teto de 3 RH por empresa, só ≥60% (helper compartilhado em lib/formato)
+  const faltaLiberar = faltaLiberarRh
+
+  const chaveEmp = (e) => e.cnpj || e.empresa || ''
+  const corEmp = (e) => confiancaDominio(e.dominio_score).cor  // 'verde' | 'ambar' | 'vermelho'
+
+  // Ordenação: valor comparável por coluna. Numéricas (contatos/confiança/data)
+  // comparam número; as demais texto (localeCompare pt-BR).
+  const COLS_NUM = ['contatos', 'confianca', 'enriquecido']
+  function valOrdenar(e, col) {
+    switch (col) {
+      case 'empresa': return nomeProprio(e.empresa) || ''
+      case 'cnpj': return String(e.cnpj || '')
+      case 'dominio': return String(e.dominio || '').toLowerCase()
+      case 'localizacao': return String(e.localizacao || '').toLowerCase()
+      case 'porte': return String(e.porte || '').toLowerCase()
+      case 'contatos': return Number(e.total_prospects ?? 0)
+      case 'confianca': return Number(e.dominio_score ?? -1)
+      case 'enriquecido': { // "DD/MM/YYYY" → AAAAMMDD
+        const m = String(e.enriquecido_em || '').match(/(\d{2})\/(\d{2})\/(\d{4})/)
+        return m ? Number(m[3] + m[2] + m[1]) : 0
+      }
+      default: return ''
+    }
+  }
+  function ordenarPor(col) {
+    if (ordCol === col) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setOrdCol(col); setOrdDir(COLS_NUM.includes(col) ? 'desc' : 'asc') }
+  }
+  // cabeçalho clicável: mostra ▲/▼ na coluna ativa, ⇅ nas demais
+  const thOrd = (col, label, cls = '') => (
+    <th className={'th-ord' + (cls ? ' ' + cls : '') + (ordCol === col ? ' ativo' : '')}
+      onClick={() => ordenarPor(col)} title="Ordenar por esta coluna">
+      <span className="th-label">{label}<span className="sort-ind">{ordCol === col ? (ordDir === 'asc' ? '▲' : '▼') : '⇅'}</span></span>
+    </th>
+  )
 
   async function carregar() {
     setLoading(true); setErro('')
@@ -349,7 +990,62 @@ export default function Empresas() {
   }
   useEffect(() => { carregar() }, [])
 
-  const visiveis = useMemo(() => {
+  function abrirNovaEmpresa() {
+    setFormEmp({ modo: 'novo', cnpj: '', empresa: '', dominio: '', localizacao: '', porte: '' })
+  }
+  function editarEmpresa(e) {
+    setFormEmp({ modo: 'editar', cnpj: e.cnpj || '', empresa: e.empresa || '', dominio: e.dominio || '', localizacao: e.localizacao || '', porte: e.porte || '' })
+  }
+
+  // Salva o cadastro/edição. No cadastro sem domínio, dispara a descoberta grátis
+  // (RDAP/Snov) e grava o domínio sugerido — sem gastar crédito de listagem.
+  async function salvarForm(d) {
+    setSalvandoEmp(true); setMsg('')
+    try {
+      await salvarEmpresa(d)
+      if (d.modo === 'novo' && !String(d.dominio || '').trim()) {
+        setMsg(`🔎 Descobrindo domínio de "${d.empresa}"…`)
+        try {
+          const r = await descobrirEmpresa(d.empresa, d.cnpj)
+          const dom = r && (r.dominio_sugerido || (r.ia && r.ia.recomendado))
+          if (dom) await salvarEmpresa({ ...d, modo: 'editar', dominio: dom })
+        } catch { /* descoberta é best-effort; a empresa já foi salva */ }
+      }
+      setFormEmp(null)
+      setMsg('✓ Empresa salva.')
+      await carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    } finally {
+      setSalvandoEmp(false)
+    }
+  }
+
+  // "Excluir" = ocultar (reversível): some da lista na hora e oferece desfazer.
+  async function ocultarEmp(e) {
+    try {
+      await ocultarEmpresa(e.cnpj, true)
+      setRows((prev) => prev.filter((x) => chaveEmp(x) !== chaveEmp(e)))
+      if (empresaAberta === chaveEmp(e)) setEmpresaAberta(null)
+      setDesfazer({ cnpj: e.cnpj, nome: e.empresa })
+      setMsg('')
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    }
+  }
+  async function desfazerOcultar() {
+    if (!desfazer) return
+    try {
+      await ocultarEmpresa(desfazer.cnpj, false)
+      setDesfazer(null)
+      await carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    }
+  }
+
+  // 1) só a busca textual (base para as contagens do filtro de cor)
+  const porBusca = useMemo(() => {
     const q = busca.trim().toLowerCase()
     if (!q) return rows
     return rows.filter((e) =>
@@ -357,12 +1053,66 @@ export default function Empresas() {
     )
   }, [rows, busca])
 
-  function toggleLinha(k) {
-    setExpandido((prev) => {
-      const s = new Set(prev)
-      s.has(k) ? s.delete(k) : s.add(k)
-      return s
-    })
+  // contagem por cor (dentro do que a busca já filtrou) — alimenta os chips
+  const contagemCor = useMemo(() => {
+    const c = { verde: 0, ambar: 0, vermelho: 0 }
+    for (const e of porBusca) c[corEmp(e)]++
+    return c
+  }, [porBusca])
+
+  // 2) aplica filtro de cor + ordenação por coluna
+  const visiveis = useMemo(() => {
+    let arr = filtroCor === 'todas' ? porBusca : porBusca.filter((e) => corEmp(e) === filtroCor)
+    if (ordCol) {
+      const num = COLS_NUM.includes(ordCol)
+      const sinal = ordDir === 'asc' ? 1 : -1
+      arr = [...arr].sort((a, b) => {
+        const va = valOrdenar(a, ordCol), vb = valOrdenar(b, ordCol)
+        const r = num ? (va - vb) : String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' })
+        return sinal * r
+      })
+    }
+    return arr
+  }, [porBusca, filtroCor, ordCol, ordDir])
+
+  // Exporta a tabela (uma linha por contato de RH) em CSV que o Excel abre.
+  // BOM UTF-8 pros acentos e ; como separador (padrão do Excel pt-BR).
+  function exportarExcel() {
+    const cols = ['Empresa', 'CNPJ', 'Localização', 'Porte', 'Capital social', 'Categoria', 'Domínio', 'Nome', 'Cargo', 'E-mail', 'Validade', 'Enriquecido em']
+    const esc = (v) => {
+      const s = String(v ?? '').replace(/"/g, '""')
+      return /[";\n]/.test(s) ? `"${s}"` : s
+    }
+    const validadeTxt = (v) => {
+      const s = String(v).toLowerCase()
+      if (v === true || s === 'valido' || s === 'valid') return 'Válido'
+      if (v === false || s === 'invalido' || s === 'invalid') return 'Inválido'
+      return '—'
+    }
+    const linhas = []
+    for (const e of visiveis) {
+      const base = [nomeProprio(e.empresa), formatarCnpj(e.cnpj), e.localizacao, e.porte, e.capital_social, e.categoria, e.dominio]
+      // exporta os dados salvos no banco (todos os contatos); respeita o toggle
+      // "Mostrar sem e-mail" (senão, só os que já têm e-mail liberado).
+      const todos = e.rh_contatos || []
+      const contatos = mostrarSemEmail ? todos : todos.filter((c) => c.email)
+      if (contatos.length === 0) {
+        linhas.push([...base, '', '', '', '', e.enriquecido_em])
+      } else {
+        for (const c of contatos) {
+          linhas.push([...base, nomeProprio(c.nome), c.cargo, c.email || '', validadeTxt(c.valido), e.enriquecido_em])
+        }
+      }
+    }
+    const csv = [cols, ...linhas].map((l) => l.map(esc).join(';')).join('\r\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const hoje = new Date().toISOString().slice(0, 10)
+    a.href = url
+    a.download = `empresas-rh-${hoje}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // Enriquece TODAS as empresas. Sem forçar: as que já estão no cache Redis
@@ -383,6 +1133,34 @@ export default function Empresas() {
       setMsg('⏳ ' + err.message)
     } finally {
       setEmLote(false)
+    }
+  }
+
+  // PAGO: auto-libera até 3 RH por empresa nas que têm confiança de domínio ≥60%
+  // (pula vermelhos/divergentes) e ainda não chegaram a 3 revelados. Roda em pool
+  // paralelo (a rota de reveal não usa ReceitaWS, então dá pra concorrer).
+  async function autoLiberarRh() {
+    const alvos = rows.map((e) => ({ e, q: faltaLiberar(e) })).filter((x) => x.q > 0 && x.e.cnpj)
+    if (!alvos.length) { setMsg('Nada a liberar: nenhuma empresa ≥60% com RH pendente (teto de 3).'); return }
+    const credEst = alvos.reduce((s, x) => s + x.q, 0)
+    if (!window.confirm(`Auto-liberar RH em ${alvos.length} empresa(s) (domínio ≥60%), até 3 cada.\nAté ~${credEst} crédito(s) Snov (1 por e-mail encontrado). Continuar?`)) return
+    setAutoLib(true); setMsg('')
+    let feitas = 0, falhas = 0
+    const fila = alvos.slice()
+    const LIMITE = 4
+    async function worker() {
+      while (fila.length) {
+        const { e, q } = fila.shift()
+        setMsg(`Liberando RH ${++feitas}/${alvos.length}: ${e.empresa} (até ${q})…`)
+        try { await rhRevelar(e.cnpj, [], 'primeiros_n', q) } catch { falhas++ }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(LIMITE, fila.length) }, worker))
+      setMsg(`Auto-liberação concluída: ${alvos.length} empresa(s)` + (falhas ? `, ${falhas} com falha` : '') + '. Clique em Atualizar em instantes.')
+      carregar()
+    } finally {
+      setAutoLib(false)
     }
   }
 
@@ -411,37 +1189,98 @@ export default function Empresas() {
     }
   }
 
+  // PAGO: desbloqueia o e-mail de um contato de RH (1 crédito Snov, se achado).
+  // Idempotente no back — reclicar num já revelado não recobra.
+  async function desbloquear(e, contato) {
+    if (revelando.has(contato.id)) return
+    if (!window.confirm(`Desbloquear o e-mail de ${contato.nome || 'este contato'}?\nGasta 1 crédito Snov (se o e-mail for encontrado).`)) return
+    setRevelando((prev) => new Set(prev).add(contato.id))
+    try {
+      await rhRevelar(e.cnpj, [contato.id], 'selecionados')
+      await carregar()
+    } catch (err) {
+      setMsg('⏳ ' + err.message)
+    } finally {
+      setRevelando((prev) => { const s = new Set(prev); s.delete(contato.id); return s })
+    }
+  }
+
   return (
     <div>
       <header className="pagina-head"><h1>Empresas</h1></header>
 
       <div className="view-toggle abas-topo">
         <button className={aba === 'empresas' ? 'ativo' : ''} onClick={() => setAba('empresas')}>Empresas enriquecidas</button>
+        <button className={aba === 'rapida' ? 'ativo' : ''} onClick={() => setAba('rapida')}>⚡ Descoberta rápida (IA + Snov)</button>
         <button className={aba === 'lote' ? 'ativo' : ''} onClick={() => setAba('lote')}>Validação de domínio em lote</button>
         <button className={aba === 'ia' ? 'ativo' : ''} onClick={() => setAba('ia')}>⚡ Validar domínios em lote (IA)</button>
       </div>
 
+<<<<<<< HEAD
       {aba === 'ia' ? (
         <ValidacaoIALote />
       ) : aba === 'lote' ? (
         <ValidacaoLote onEnriquecido={carregar} />
+=======
+      {aba === 'lote' ? (
+        <ValidacaoLote onEnriquecido={carregar} irParaEmpresas={() => setAba('empresas')} />
+      ) : aba === 'rapida' ? (
+        <DescobertaRapida onEnriquecido={carregar} irParaEmpresas={() => setAba('empresas')} />
+>>>>>>> 2f8ca42448a6d176531f1d492a88c36f641b757b
       ) : (
       <>
-      <p className="ajuda">Empresas enriquecidas via Hunter: domínio, site, localização, nº de funcionários, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
+      <p className="ajuda">Empresas enriquecidas via Snov.io: domínio, site, localização, porte, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
 
       {erro && <div className="banner">{erro}</div>}
       {msg && <div className="banner">{msg}</div>}
+      {desfazer && (
+        <div className="banner banner-undo">
+          Empresa <b>{nomeProprio(desfazer.nome)}</b> ocultada da lista.
+          <button className="link-mini" onClick={desfazerOcultar}>desfazer</button>
+          <button className="link-mini link-x" onClick={() => setDesfazer(null)}>×</button>
+        </div>
+      )}
 
       <div className="toolbar">
         <input placeholder="Buscar empresa, CNPJ, domínio ou local..." value={busca} onChange={(e) => setBusca(e.target.value)} />
         <button className="btn-refresh" onClick={carregar}>Atualizar</button>
+        {CRUD_EMPRESA_ATIVO && <button className="btn-refresh" onClick={abrirNovaEmpresa}>+ Adicionar</button>}
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
-        <div className="view-toggle">
-          <button className={view === 'cards' ? 'ativo' : ''} onClick={() => setView('cards')}>Cartões</button>
-          <button className={view === 'tabela' ? 'ativo' : ''} onClick={() => setView('tabela')}>Tabela</button>
-        </div>
+        {(() => {
+          const nAuto = rows.reduce((s, e) => s + (e.cnpj ? Math.min(1, faltaLiberar(e)) : 0), 0)
+          return (
+            <button className="btn-primario btn-liberar-lote" disabled={autoLib || nAuto === 0} onClick={autoLiberarRh}
+              title="Libera até 3 e-mails de RH por empresa com confiança de domínio ≥60% (gasta crédito Snov)">
+              {autoLib ? 'Liberando…' : `🔓 Auto-liberar 3 RH${nAuto ? ` (${nAuto})` : ''}`}
+            </button>
+          )
+        })()}
+        <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Exportar Excel" aria-label="Exportar Excel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" fill="#fff" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="M13 2v7h7" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
+            <rect x="7" y="12" width="10" height="7" rx="1" fill="#1D6F42"/>
+            <path d="M9.4 13.7l3.2 3.6M12.6 13.7l-3.2 3.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div className="filtro-cor">
+        <span className="fc-label">Confiança do domínio:</span>
+        {[
+          { k: 'todas', txt: 'Todas', n: porBusca.length },
+          { k: 'verde', txt: 'Confere', n: contagemCor.verde },
+          { k: 'ambar', txt: 'Nome coerente', n: contagemCor.ambar },
+          { k: 'vermelho', txt: 'Revisar', n: contagemCor.vermelho },
+        ].map(({ k, txt, n }) => (
+          <button key={k}
+            className={'fc-chip' + (filtroCor === k ? ' ativo' : '') + (k !== 'todas' ? ' conf-' + k : '')}
+            onClick={() => setFiltroCor((cur) => (cur === k ? 'todas' : k))}>
+            {k !== 'todas' && <i className="conf-dot" />}{txt} <b>{n}</b>
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -449,111 +1288,133 @@ export default function Empresas() {
       ) : visiveis.length === 0 ? (
         <div className="secao"><div className="empty">Nenhuma empresa enriquecida ainda.</div></div>
       ) : view === 'cards' ? (
-        <div className="empresas-grid">
-          {visiveis.map((e, i) => (
-            <div className="empresa-card" key={e.cnpj || e.empresa || i}>
-              <div className="empresa-topo">
-                <CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={48} />
-                <div className="empresa-id">
-                  <div className="empresa-nome">{e.empresa || '—'}</div>
-                  <div className="empresa-cnpj">{e.cnpj || 'CNPJ —'}</div>
-                </div>
-              </div>
-
-              <div className="empresa-linha">
-                <span className="chave">Domínio</span>
-                <span className="dom-linha">
-                  {e.dominio || '—'}
-                  <button className="link-mini" onClick={() => setPickerKey(pickerKey === (e.cnpj || e.empresa || i) ? null : (e.cnpj || e.empresa || i))}>trocar</button>
-                </span>
-              </div>
-              {pickerKey === (e.cnpj || e.empresa || i) && (
-                <DomainPicker nome={e.empresa} onEscolher={(dom) => escolherDominio(e, dom)} onFechar={() => setPickerKey(null)} />
-              )}
-              <div className="empresa-linha"><span className="chave">Site</span>{e.site ? <a href={e.site} target="_blank" rel="noreferrer">{e.site}</a> : <span>—</span>}</div>
-              <div className="empresa-linha"><span className="chave">Localização</span><span>{e.localizacao || '—'}</span></div>
-              <div className="empresa-linha"><span className="chave">Funcionários</span><span>{e.funcionarios || '—'}</span></div>
-              <div className="empresa-linha"><span className="chave">Categoria</span><span>{e.categoria || '—'}</span></div>
-
-              <div className="empresa-rh">
-                <div className="chave">E-mails de RH ({(e.emails_rh || []).length})</div>
-                {(e.emails_rh && e.emails_rh.length > 0) ? (
-                  e.emails_rh.map((em, j) => (
-                    <div className="rh-item" key={j}>
-                      <span className="rh-info">
-                        <span>{em.email || em}</span>
-                        {em.cargo && <small className="rh-cargo">{em.cargo}</small>}
-                      </span>
-                      <PillEmail valido={em.valido} />
-                    </div>
-                  ))
-                ) : (
-                  <span className="ajuda">nenhum e-mail encontrado</span>
-                )}
-              </div>
-
-              <div className="acoes">
-                <button className="btn-mini" onClick={() => enriquecer(e)}>reenriquecer</button>
-                {e.enriquecido_em && <span className="ajuda">enriquecido em {e.enriquecido_em}</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="preview-wrap">
+        <>
           <table className="preview">
             <thead>
               <tr>
-                <th></th><th>Empresa</th><th>CNPJ</th><th>Localização</th>
-                <th>Funcionários</th><th>Categoria</th><th>Domínio</th>
-                <th>E-mails RH</th><th>Enriquecido</th>
+                {thOrd('empresa', 'Empresa')}
+                {thOrd('cnpj', 'CNPJ')}
+                {thOrd('dominio', 'Domínio')}
+                {thOrd('confianca', 'Confiança', 'col-cen')}
+                {thOrd('localizacao', 'Localização')}
+                {thOrd('porte', 'Porte')}
+                {thOrd('contatos', 'Contatos', 'col-cen')}
+                {thOrd('enriquecido', 'Enriquecido em')}
+                {CRUD_EMPRESA_ATIVO && <th className="col-cen">Ações</th>}
               </tr>
             </thead>
             <tbody>
-              {visiveis.map((e, i) => {
-                const k = e.cnpj || e.empresa || String(i)
-                const aberto = expandido.has(k)
-                const emails = e.emails_rh || []
-                return (
-                  <Fragment key={k}>
-                    <tr className="linha-empresa" onClick={() => toggleLinha(k)}>
-                      <td>{emails.length > 0 ? (aberto ? '▾' : '▸') : ''}</td>
-                      <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{e.empresa || '—'}</span></td>
-                      <td>{e.cnpj || '—'}</td>
-                      <td>{e.localizacao || '—'}</td>
-                      <td>{e.funcionarios || '—'}</td>
-                      <td>{e.categoria || '—'}</td>
-                      <td>{e.dominio || '—'}</td>
-                      <td>{emails.length}</td>
+              {visiveis.map((e, i) => (
+                <tr key={e.cnpj || e.empresa || i} className="linha-clicavel" onClick={() => setEmpresaAberta(chaveEmp(e))} title="Ver empresa">
+                  <td><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={24} />{nomeProprio(e.empresa) || '—'}</span></td>
+                  <td>{formatarCnpj(e.cnpj) || '—'}</td>
+                  <td>{e.dominio || '—'}{e.dominio_count != null && <small className="dom-count"> · {e.dominio_count}</small>}<SeloRobo e={e} /></td>
+                  <td className="col-cen"><ChipConfianca e={e} /></td>
+                  <td>{e.localizacao || '—'}</td>
+                  <td>{e.porte || '—'}</td>
+                  <td className="col-cen">{e.total_prospects ?? 0}{(e.total_rh ?? 0) > 0 && <span className="tag-rh"> · {e.total_rh} RH</span>}</td>
+                  <td>{e.enriquecido_em || '—'}</td>
+                  {CRUD_EMPRESA_ATIVO && (
+                    <td className="col-cen col-acoes" onClick={(ev) => ev.stopPropagation()}>
+                      <button className="btn-acao" title="Editar dados da empresa" onClick={() => editarEmpresa(e)}>✏️</button>
+                      <button className="btn-acao btn-acao-del" title="Ocultar empresa da lista (reversível)" onClick={() => ocultarEmp(e)}>🗑️</button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+              {visiveis.length === 0 && <tr><td colSpan={CRUD_EMPRESA_ATIVO ? 9 : 8} className="empty">Nenhuma empresa.</td></tr>}
+            </tbody>
+          </table>
+          <small className="ajuda">Clique numa empresa pra abrir o painel com domínio, contatos e ações (desbloquear e-mail, trocar domínio, reenriquecer).</small>
+        </>
+      ) : (
+        <div className="preview-wrap tabela-full">
+          <table className="grade">
+            <thead>
+              <tr>
+                {thOrd('empresa', 'Empresa', 'col-emp')}
+                {thOrd('cnpj', 'CNPJ')}
+                {thOrd('localizacao', 'Localização')}
+                {thOrd('porte', 'Porte')}
+                {thOrd('dominio', 'Domínio')}
+                <th>Nome</th>
+                <th>Cargo</th>
+                <th>E-mail</th>
+                <th className="col-cen">Validade</th>
+                <th>Enriquecido em</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiveis.flatMap((e, i) => {
+                // dados salvos no banco (rh_contatos): todos os contatos, com ou sem
+                // e-mail liberado. Sem o toggle, mostra só os que já têm e-mail.
+                const todos = e.rh_contatos || []
+                const contatos = mostrarSemEmail ? todos : todos.filter((c) => c.email)
+                const cnpj = e.cnpj || e.empresa || ''   // chave estável p/ React key
+                const cabec = () => (
+                  <>
+                    <td className="col-emp"><span className="empresa-cel"><CompanyLogo dominio={e.dominio} logo={e.logo} nome={e.empresa} size={22} />{nomeProprio(e.empresa) || '—'}</span></td>
+                    <td>{formatarCnpj(e.cnpj) || '—'}</td>
+                    <td>{e.localizacao || '—'}</td>
+                    <td>{e.porte || '—'}</td>
+                    <td>{e.dominio || '—'}<ChipConfianca e={e} /><SeloRobo e={e} /></td>
+                  </>
+                )
+                if (contatos.length === 0) {
+                  const semTexto = todos.length > 0
+                    ? 'contatos sem e-mail liberado — clique em “Mostrar sem e-mail”'
+                    : 'nenhum contato salvo ainda'
+                  return [(
+                    <tr key={cnpj + '-vazia'} className="grupo-inicio">
+                      {cabec()}
+                      <td colSpan={3} className="cel-vazia">{semTexto}</td>
+                      <td className="col-cen">—</td>
                       <td>{e.enriquecido_em || '—'}</td>
                     </tr>
-                    {aberto && emails.length > 0 && (
-                      <tr className="linha-detalhe">
-                        <td></td>
-                        <td colSpan={8}>
-                          <table className="sub">
-                            <thead><tr><th>E-mail</th><th>Cargo</th><th>Departamento</th><th>Validade</th></tr></thead>
-                            <tbody>
-                              {emails.map((em, j) => (
-                                <tr key={j}>
-                                  <td>{em.email || '—'}</td>
-                                  <td>{em.cargo || '—'}</td>
-                                  <td>{em.departamento || '—'}</td>
-                                  <td><PillEmail valido={em.valido} /></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                )
+                  )]
+                }
+                return contatos.map((c, j) => (
+                  <tr key={cnpj + '-' + (c.id ?? j)} className={j === 0 ? 'grupo-inicio' : 'grupo-cont'}>
+                    {j === 0
+                      ? cabec()
+                      : <><td className="col-emp"></td><td></td><td></td><td></td><td></td></>}
+                    <td>{nomeProprio(c.nome) || '—'}{c.eh_rh && <span className="tag-rh-mini">RH</span>}</td>
+                    <td>{c.cargo || '—'}</td>
+                    <td className="cel-email">
+                      {c.email
+                        ? c.email
+                        : <button className="btn-olho" title="Desbloquear e-mail (1 crédito Snov)" disabled={revelando.has(c.id)} onClick={() => desbloquear(e, c)}>
+                            {revelando.has(c.id) ? '…' : (
+                              <>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                                </svg>
+                                desbloquear
+                              </>
+                            )}
+                          </button>}
+                    </td>
+                    <td className="col-cen">{c.email ? <PillEmail valido={c.valido} /> : <span className="ajuda">—</span>}</td>
+                    <td>{j === 0 ? (e.enriquecido_em || '—') : ''}</td>
+                  </tr>
+                ))
               })}
             </tbody>
           </table>
-          <small className="ajuda">Clique numa linha para ver os cargos encontrados.</small>
+          <small className="ajuda">Uma linha por contato salvo no banco. Clique em <b>“Mostrar sem e-mail”</b> pra ver quem ainda não foi desbloqueado e liberar direto aqui (👁).</small>
         </div>
+      )}
+
+      {empresaAberta && (
+        <PainelEmpresa
+          empresa={visiveis.find((x) => chaveEmp(x) === empresaAberta) || rows.find((x) => chaveEmp(x) === empresaAberta)}
+          aoFechar={() => setEmpresaAberta(null)}
+          aoAtualizar={carregar}
+        />
+      )}
+      {formEmp && (
+        <FormEmpresa inicial={formEmp} salvando={salvandoEmp} onSalvar={salvarForm} onFechar={() => { if (!salvandoEmp) setFormEmp(null) }} />
       )}
       </>
       )}
