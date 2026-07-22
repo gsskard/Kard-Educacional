@@ -84,6 +84,7 @@ export default function ValidacaoIALote() {
     async function trabalhador() {
       while (filaAtual.length > 0 && !pararRef.current) {
         const alvo = filaAtual.shift() // remove da fila ANTES de chamar (evita duplicar)
+        if (!alvo || !String(alvo.empresa || '').trim()) continue // fila antiga pode ter lixo
         try {
           const r = await validarDominioIA(alvo.empresa, alvo.cnpj, `lote-${total}`)
           registrar({ ...alvo, ...r })
