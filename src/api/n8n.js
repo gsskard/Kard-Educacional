@@ -23,6 +23,8 @@ export const sugerirDominios = (nome) => empresasService.sugerirDominios(nome)
 export const validarDominio = (empresa, cnpj) => empresasService.validarDominio(empresa, cnpj)
 export const iniciarValidacaoLote = (loteId, registros) => empresasService.iniciarLote(loteId, registros)
 export const lerValidacoes = (loteId) => empresasService.lerLote(loteId)
+export const validarDominioIA = (razaoSocial, cnpj, loteId) =>
+  empresasService.validarDominioIA(razaoSocial, cnpj, loteId)
 
 // RF-39/40: eventos de e-mail — endpoint ainda não existe no n8n.
 export function listarEventos() {

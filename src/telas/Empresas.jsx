@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { listarEmpresas, enriquecerEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
+import ValidacaoIALote from '../componentes/ValidacaoIALote'
 
 // Seletor de domínio: mostra sugestões (Clearbit) + campo manual, pra o usuário
 // escolher o domínio certo quando o nome é ambíguo (ex.: Kard, O Boticário).
@@ -417,9 +418,12 @@ export default function Empresas() {
       <div className="view-toggle abas-topo">
         <button className={aba === 'empresas' ? 'ativo' : ''} onClick={() => setAba('empresas')}>Empresas enriquecidas</button>
         <button className={aba === 'lote' ? 'ativo' : ''} onClick={() => setAba('lote')}>Validação de domínio em lote</button>
+        <button className={aba === 'ia' ? 'ativo' : ''} onClick={() => setAba('ia')}>⚡ Validar domínios em lote (IA)</button>
       </div>
 
-      {aba === 'lote' ? (
+      {aba === 'ia' ? (
+        <ValidacaoIALote />
+      ) : aba === 'lote' ? (
         <ValidacaoLote onEnriquecido={carregar} />
       ) : (
       <>

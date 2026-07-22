@@ -55,6 +55,25 @@ export class EmpresasService {
     const lista = Array.isArray(data) ? data : (data?.data || [])
     return lista.map((r) => ({ ...r, candidatos: Empresa.parseEmails(r.candidatos) }))
   }
+
+  // POST /enriquecer-empresa — valida o domínio de UMA empresa via IA (workflow
+  // post-enriquecer-dominio). O n8n salva o resultado na Data Table
+  // `enriquecimento_dominio` e responde com o JSON da validação.
+  // A tela controla a concorrência (até 10 chamadas em paralelo).
+  async validarDominioIA(razaoSocial, cnpj, loteId) {
+    const r = await this.api.post('/enriquecer-empresa', {
+      razao_social: razaoSocial,
+      cnpj: cnpj || '',
+      lote_id: loteId || '',
+    })
+    // o webhook responde texto JSON; o ApiClient já parseia, mas garantimos objeto
+    const dados = typeof r === 'string' ? JSON.parse(r) : (r || {})
+    // emails vem como texto JSON (formato da tabela do n8n) — vira lista
+    if (typeof dados.emails === 'string') {
+      try { dados.emails = JSON.parse(dados.emails) } catch { dados.emails = [] }
+    }
+    return dados
+  }
 }
 
 export const empresasService = new EmpresasService()
