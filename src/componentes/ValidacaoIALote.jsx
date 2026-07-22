@@ -33,6 +33,7 @@ export default function ValidacaoIALote() {
   const [resultados, setResultados] = useState([]) // já validadas nesta sessão
   const [rodando, setRodando] = useState(false)
   const [msg, setMsg] = useState('')
+  const [paralelo, setParalelo] = useState(3) // quantas rodam ao mesmo tempo
   const pararRef = useRef(false)
 
   // Recupera resultados de um lote interrompido (os dados também estão no banco).
@@ -61,10 +62,10 @@ export default function ValidacaoIALote() {
     leitor.readAsText(f)
   }
 
-  // Processa a fila com até PARALELO requisições ao mesmo tempo (10 jobs no n8n).
+  // Processa a fila com até `paralelo` requisições ao mesmo tempo.
   // Cada "trabalhador" pega a próxima empresa da fila assim que termina a sua.
-  const PARALELO = 10
   async function processar(filaInicial, resultadosIniciais) {
+    const PARALELO = paralelo
     setRodando(true)
     pararRef.current = false
     const filaAtual = [...filaInicial]
@@ -168,6 +169,17 @@ export default function ValidacaoIALote() {
       )}
 
       <div className="toolbar">
+        {!rodando && (
+          <label className="ajuda" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            Velocidade:
+            <select className="dom-select" value={paralelo} onChange={(e) => setParalelo(Number(e.target.value))}>
+              <option value={1}>1 por vez (mais seguro, bem lento)</option>
+              <option value={3}>3 em paralelo (recomendado)</option>
+              <option value={5}>5 em paralelo</option>
+              <option value={10}>10 em paralelo (rápido, pode dar timeout)</option>
+            </select>
+          </label>
+        )}
         {!rodando && (
           <button className="btn-primario" onClick={iniciar} disabled={!texto.trim()}>
             {`Validar ${parseLinhas(texto).length || ''} domínio(s) em lote`}
