@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, descobrirRapido, salvarEmpresa, ocultarEmpresa, sugerirDominios, iniciarValidacaoLote, lerValidacoes, rhPreview, rhRevelar, rhValidar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
-<<<<<<< HEAD
 import ValidacaoIALote from '../componentes/ValidacaoIALote'
-=======
 import PainelEmpresa from '../componentes/PainelEmpresa'
 import { nomeProprio, formatarCnpj, confiancaDominio, faltaLiberarRh } from '../lib/formato'
 import { iniciarLoteJob, assinarLote, estadoLote, limparConcluidoLote, resolverPendente, descartarPendente } from '../lib/loteJob'
->>>>>>> 2f8ca42448a6d176531f1d492a88c36f641b757b
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
@@ -1216,17 +1213,12 @@ export default function Empresas() {
         <button className={aba === 'ia' ? 'ativo' : ''} onClick={() => setAba('ia')}>⚡ Validar domínios em lote (IA)</button>
       </div>
 
-<<<<<<< HEAD
       {aba === 'ia' ? (
         <ValidacaoIALote />
       ) : aba === 'lote' ? (
-        <ValidacaoLote onEnriquecido={carregar} />
-=======
-      {aba === 'lote' ? (
         <ValidacaoLote onEnriquecido={carregar} irParaEmpresas={() => setAba('empresas')} />
       ) : aba === 'rapida' ? (
         <DescobertaRapida onEnriquecido={carregar} irParaEmpresas={() => setAba('empresas')} />
->>>>>>> 2f8ca42448a6d176531f1d492a88c36f641b757b
       ) : (
       <>
       <p className="ajuda">Empresas enriquecidas via Snov.io: domínio, site, localização, porte, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
