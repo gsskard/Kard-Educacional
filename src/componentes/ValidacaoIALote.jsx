@@ -6,7 +6,8 @@ import CompanyLogo from './CompanyLogo'
 // Dispara até 10 empresas em paralelo; cada vaga puxa a próxima da fila ao terminar.
 // Cada resultado também é salvo pelo n8n na Data Table `enriquecimento_dominio`.
 
-// Lê linhas no formato "empresa;cnpj" (cnpj opcional). Ignora linhas vazias.
+// Lê linhas no formato "empresa;cnpj" (cnpj opcional). Ignora linhas vazias e
+// o cabeçalho (ex.: "RAZÃO SOCIAL;CNPJ"), que não é uma empresa de verdade.
 function parseLinhas(texto) {
   return texto
     .split(/\r?\n/)
@@ -17,6 +18,11 @@ function parseLinhas(texto) {
       return { empresa, cnpj }
     })
     .filter((r) => r.empresa)
+    .filter((r) => {
+      const emp = r.empresa.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      const ehCabecalho = ['razao social', 'empresa', 'nome', 'cliente'].includes(emp) || r.cnpj.toLowerCase() === 'cnpj'
+      return !ehCabecalho
+    })
 }
 
 const CHAVE_STORAGE = 'kard_lote_ia'
