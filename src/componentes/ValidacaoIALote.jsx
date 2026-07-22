@@ -194,6 +194,7 @@ export default function ValidacaoIALote() {
                 <span className={'pill ' + (Number(r.score) >= 75 ? 'pill-ok' : Number(r.score) >= 45 ? 'pill-neutro' : 'pill-erro')}>
                   score {r.score ?? 0} · {r.confianca || 'nenhuma'}
                 </span>
+                {r.do_banco && <span className="pill pill-neutro" title="Resultado reaproveitado do banco (validado há menos de 3 meses)">💾 do banco</span>}
                 {r.observacao && <span className="ia-just">{r.observacao}</span>}
               </div>
               {Array.isArray(r.emails) && r.emails.length > 0 && r.emails[0] !== '-' && (
