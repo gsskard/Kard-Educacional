@@ -252,14 +252,21 @@ export default function ValidacaoIALote() {
                         ? <span className="pill pill-ok">{l.com_dominio}</span>
                         : <span className="pill pill-neutro">0</span>}
                     </td>
-                    <td className="hist-conf">
-                      {l.alta > 0 && <span className="pill pill-ok" title="confiança alta">{l.alta} alta</span>}
-                      {l.media > 0 && <span className="pill pill-neutro" title="confiança média">{l.media} média</span>}
-                      {l.baixa > 0 && <span className="pill pill-erro" title="confiança baixa">{l.baixa} baixa</span>}
-                      {!l.alta && !l.media && !l.baixa && <span className="ajuda">—</span>}
+                    <td>
+                      <div className="hist-conf">
+                        {l.alta > 0 && <span className="pill pill-ok" title="confiança alta">{l.alta} alta</span>}
+                        {l.media > 0 && <span className="pill pill-neutro" title="confiança média">{l.media} média</span>}
+                        {l.baixa > 0 && <span className="pill pill-erro" title="confiança baixa">{l.baixa} baixa</span>}
+                        {!l.alta && !l.media && !l.baixa && <span className="ajuda">—</span>}
+                      </div>
                     </td>
                     <td className="hist-acao">
-                      <a className="hist-baixar" href={urlCsvLote(l.lote_id)} title="Baixar o resultado completo deste lote">⬇ CSV</a>
+                      <a className="hist-baixar" href={urlCsvLote(l.lote_id)} title="Baixar o CSV completo deste lote" aria-label={`Baixar CSV do ${l.lote_id}`}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M12 3v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </a>
                     </td>
                   </tr>
                 ))}
