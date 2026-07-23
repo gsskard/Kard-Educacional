@@ -98,7 +98,7 @@ export default function ValidacaoIALote() {
     function registrar(item) {
       acumulado = [...acumulado, item]
       setResultados(acumulado)
-      setFila([...filaAtual])
+      setFila([...filaAtual, ...emVoo]) // inclui as em requisição: senão o contador da barra "perde" até 10
       persistir()
       setMsg(`Validando… ${acumulado.length}/${total} concluídas (${Math.min(PARALELO, filaAtual.length)} em paralelo).`)
     }
