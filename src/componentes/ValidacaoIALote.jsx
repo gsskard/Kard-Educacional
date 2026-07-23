@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { validarDominioIA } from '../api/n8n'
+import { validarDominioIA, listarLotesDominio, urlCsvLote } from '../api/n8n'
 import CompanyLogo from './CompanyLogo'
 
 // Validação de domínio em lote via IA (workflow n8n post-enriquecer-dominio).
@@ -34,6 +34,8 @@ export default function ValidacaoIALote() {
   const [rodando, setRodando] = useState(false)
   const [msg, setMsg] = useState('')
   const [paralelo, setParalelo] = useState(3) // quantas rodam ao mesmo tempo
+  const [historico, setHistorico] = useState(null) // null = fechado; [] = aberto (lista de lotes)
+  const [carregandoHist, setCarregandoHist] = useState(false)
   const pararRef = useRef(false)
 
   // Recupera resultados de um lote interrompido (os dados também estão no banco).
@@ -131,11 +133,31 @@ export default function ValidacaoIALote() {
         String(r.score ?? ''), r.confianca || '', String(r.observacao || '').replace(/"/g, "'"),
       ])
     }
-    const csv = linhas.map((l) => l.map((c) => `"${String(c)}"`).join(';')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    // ﻿ (BOM) + \r\n: sem o BOM o Excel abre UTF-8 como Latin-1 e os acentos viram "DomÃ­nio"
+    const csv = linhas.map((l) => l.map((c) => `"${String(c)}"`).join(';')).join('\r\n')
+    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
     a.href = url; a.download = 'validacao-dominios-ia.csv'; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Abre/fecha o histórico de lotes (todos os lotes já salvos no banco pelo n8n).
+  async function alternarHistorico() {
+    if (historico) { setHistorico(null); return }
+    setCarregandoHist(true)
+    try {
+      setHistorico(await listarLotesDominio())
+    } catch (err) {
+      setMsg('Não deu pra carregar o histórico: ' + err.message)
+    } finally {
+      setCarregandoHist(false)
+    }
+  }
+
+  // "2026-07-23T12:17:57..." → "23/07/2026 12:17"
+  function dataCurta(iso) {
+    const m = String(iso || '').match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/)
+    return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : '—'
   }
 
   const total = fila.length + resultados.length
@@ -198,8 +220,40 @@ export default function ValidacaoIALote() {
         {!rodando && (resultados.length > 0 || fila.length > 0) && (
           <button className="btn-refresh" onClick={novoLote}>Novo lote</button>
         )}
+        {!rodando && (
+          <button className="btn-refresh" onClick={alternarHistorico} disabled={carregandoHist}>
+            {carregandoHist ? 'Carregando…' : historico ? 'Fechar histórico' : '🗂️ Histórico de lotes'}
+          </button>
+        )}
         {total > 0 && <span className="ajuda">{resultados.length}/{total} concluídas</span>}
       </div>
+
+      {historico && (
+        <div className="lote-card" style={{ marginTop: 12 }}>
+          <h3 style={{ margin: '0 0 8px' }}>Histórico de lotes ({historico.length})</h3>
+          {historico.length === 0 ? (
+            <p className="ajuda">Nenhum lote salvo no banco ainda.</p>
+          ) : (
+            <table className="tabela" style={{ width: '100%' }}>
+              <thead>
+                <tr><th>Lote</th><th>Data</th><th>Empresas</th><th>Com domínio</th><th>Alta / Média / Baixa</th><th></th></tr>
+              </thead>
+              <tbody>
+                {historico.map((l) => (
+                  <tr key={l.lote_id}>
+                    <td>{l.lote_id}</td>
+                    <td>{dataCurta(l.inicio)}</td>
+                    <td>{l.empresas}</td>
+                    <td>{l.com_dominio}</td>
+                    <td>{l.alta} / {l.media} / {l.baixa}</td>
+                    <td><a className="btn-refresh" href={urlCsvLote(l.lote_id)}>Baixar CSV</a></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {resultados.length > 0 && (
         <div className="lote-resultados">

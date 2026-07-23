@@ -41,6 +41,8 @@ export const iniciarValidacaoLote = (loteId, registros) => empresasService.inici
 export const lerValidacoes = (loteId) => empresasService.lerLote(loteId)
 export const validarDominioIA = (razaoSocial, cnpj, loteId) =>
   empresasService.validarDominioIA(razaoSocial, cnpj, loteId)
+export const listarLotesDominio = () => empresasService.listarLotesDominio()
+export const urlCsvLote = (loteId) => empresasService.urlCsvLote(loteId)
 
 // --- Enriquecimento de RH (Snov.io) — 3 rotas: preview (grátis), revelar/validar (pago) ---
 export const rhPreview = (empresa, cnpj, dominio, cargosAlvo) => rhService.preview(empresa, cnpj, dominio, cargosAlvo)

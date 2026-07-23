@@ -121,6 +121,18 @@ export class EmpresasService {
     }
     return dados
   }
+
+  // GET /lotes-dominio — histórico de todos os lotes já validados via IA
+  // (agregado da Data Table `enriquecimento_dominio` no n8n).
+  async listarLotesDominio() {
+    const data = await this.api.get('/lotes-dominio', { format: 'json' })
+    return Array.isArray(data) ? data : []
+  }
+
+  // URL de download do CSV completo de um lote (o n8n responde text/csv).
+  urlCsvLote(loteId) {
+    return `${this.api.base}/lote-dominio-csv?lote_id=${encodeURIComponent(loteId)}`
+  }
 }
 
 export const empresasService = new EmpresasService()
