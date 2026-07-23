@@ -304,7 +304,7 @@ export default function ValidacaoIALote() {
 
       {resultados.length > 0 && (
         <div className="lote-resultados">
-          {resultados.map((r, i) => (
+          {resultados.slice(0, visiveis).map((r, i) => (
             <div className="lote-card" key={(r.cnpj || '') + (r.razao_social || r.empresa || '') + i}>
               <div className="lote-topo">
                 <CompanyLogo dominio={r.dominio} nome={r.razao_social || r.empresa} size={44} />
@@ -341,6 +341,11 @@ export default function ValidacaoIALote() {
               )}
             </div>
           ))}
+        </div>
+      )}
+      {resultados.length > visiveis && (
+        <div ref={sentinelaRef} className="lote-sentinela">
+          Mostrando {visiveis} de {resultados.length} — role para carregar mais…
         </div>
       )}
     </div>
