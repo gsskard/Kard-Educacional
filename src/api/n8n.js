@@ -49,6 +49,7 @@ export const rhPreview = (empresa, cnpj, dominio, cargosAlvo) => rhService.previ
 export const rhRevelar = (cnpj, hashes, modo, n) => rhService.revelar(cnpj, hashes, modo, n)
 export const rhValidar = (hashes) => rhService.validar(hashes)
 export const snovSaldo = () => rhService.saldo()
+export const saldosPlataformas = () => rhService.saldosPlataformas()
 
 // RF-39/40: eventos de e-mail — endpoint ainda não existe no n8n.
 export function listarEventos() {

@@ -63,6 +63,18 @@ export class RhService {
     const data = await this.api.get('/crm-cobranca/snov-saldo')
     return { creditos: data?.creditos ?? null, atualizadoEm: data?.atualizado_em || null }
   }
+
+  // GET /saldos-plataformas — saldos de todas as plataformas de enriquecimento.
+  // Responde { snov, hunter, serper, apollo, atualizado_em } (null = sem API de saldo).
+  async saldosPlataformas() {
+    const data = await this.api.get('/saldos-plataformas')
+    return {
+      snov: data?.snov ?? null,
+      hunter: data?.hunter ?? null,
+      serper: data?.serper ?? null,
+      apollo: data?.apollo ?? null,
+    }
+  }
 }
 
 export const rhService = new RhService()

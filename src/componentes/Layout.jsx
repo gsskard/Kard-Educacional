@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { irPara } from '../hooks/useHashRoute'
-import { snovSaldo } from '../api/n8n'
+import { saldosPlataformas, snovSaldo } from '../api/n8n'
 
 // Layout no estilo do "Portal Super Crédito" da Kard:
 // sidebar branca com logo + menu (chevron), topo com breadcrumb e usuário.
@@ -34,25 +34,64 @@ function SnovIcon() {
   )
 }
 
-// Chip de saldo Snov no topo (aparece em todas as telas).
-function SnovCreditos() {
-  const [creditos, setCreditos] = useState(null)
-  const [erro, setErro] = useState(false)
+// Ícones das demais plataformas (marcas simplificadas em SVG, sem arquivo externo).
+function HunterIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect width="24" height="24" rx="6" fill="#fa5320" />
+      <path d="M8 6.5v11M16 6.5v11M8 12h8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+function SerperIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect width="24" height="24" rx="6" fill="#2563eb" />
+      <circle cx="11" cy="11" r="4.2" stroke="#fff" strokeWidth="2" />
+      <path d="M14.2 14.2L17.5 17.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+function ApolloIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect width="24" height="24" rx="6" fill="#1f2937" />
+      <path d="M12 5.5l5.5 13h-3l-2.5-6.3-2.5 6.3H6L11.5 5.5h.5z" fill="#ffd200" />
+    </svg>
+  )
+}
+
+// Chips de saldo das plataformas no topo (aparecem em todas as telas).
+// Snov e Hunter têm API de saldo; Serper e Apollo não expõem (mostram "—").
+function SaldosPlataformas() {
+  const [saldos, setSaldos] = useState(null)
   useEffect(() => {
     let vivo = true
-    snovSaldo()
-      .then((s) => { if (vivo) setCreditos(s.creditos) })
-      .catch(() => { if (vivo) setErro(true) })
+    saldosPlataformas()
+      .then((s) => { if (vivo) setSaldos(s) })
+      .catch(() => {
+        // fallback: pelo menos o saldo Snov, pelo endpoint antigo
+        snovSaldo()
+          .then((s) => { if (vivo) setSaldos({ snov: s.creditos, hunter: null, serper: null, apollo: null }) })
+          .catch(() => { if (vivo) setSaldos({}) })
+      })
     return () => { vivo = false }
   }, [])
-  const texto = erro || creditos == null
-    ? '—'
-    : creditos.toLocaleString('pt-BR')
+  const fmt = (v) => (v == null ? '—' : Number(v).toLocaleString('pt-BR'))
+  const chips = [
+    { chave: 'snov', Icone: SnovIcon, titulo: 'Créditos disponíveis na Snov.io' },
+    { chave: 'hunter', Icone: HunterIcon, titulo: 'Requisições restantes no mês na Hunter.io (buscas + verificações)' },
+    { chave: 'serper', Icone: SerperIcon, titulo: 'Serper.dev não expõe saldo por API — veja em serper.dev/dashboard' },
+    { chave: 'apollo', Icone: ApolloIcon, titulo: 'Apollo.io não expõe saldo por API — veja em app.apollo.io' },
+  ]
   return (
-    <span className="snov-chip" title="Créditos disponíveis na Snov.io">
-      <SnovIcon />
-      <span className="snov-chip-num">{texto}</span>
-      <span className="snov-chip-label">créditos</span>
+    <span className="saldos-chips">
+      {chips.map(({ chave, Icone, titulo }) => (
+        <span className="snov-chip" key={chave} title={titulo}>
+          <Icone />
+          <span className="snov-chip-num">{saldos ? fmt(saldos[chave]) : '…'}</span>
+        </span>
+      ))}
     </span>
   )
 }
@@ -110,7 +149,7 @@ export default function Layout({ rota, children }) {
             <span className="crumb-atual">{tituloAtual}</span>
           </div>
           <div className="topo-direita">
-            <SnovCreditos />
+            <SaldosPlataformas />
             <div className="usuario">
               <span className="usuario-icone">👤</span>
               {USUARIO}
