@@ -300,13 +300,33 @@ export default function ValidacaoIALote() {
         {rodando && (
           <button className="btn-refresh" onClick={() => { pararRef.current = true }}>Pausar</button>
         )}
-        {resultados.length > 0 && <button className="btn-refresh" onClick={baixarCSV}>Baixar resultado (CSV)</button>}
+        {resultados.length > 0 && (
+          <button className="btn-refresh btn-icone" onClick={baixarCSV} title="Baixar resultado (CSV)" aria-label="Baixar resultado em CSV">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
         {!rodando && (resultados.length > 0 || fila.length > 0) && (
-          <button className="btn-refresh" onClick={novoLote}>Novo lote</button>
+          <button className="btn-refresh btn-icone" onClick={novoLote} title="Novo lote" aria-label="Começar um novo lote">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
         )}
         {!rodando && (
-          <button className="btn-refresh" onClick={alternarHistorico} disabled={carregandoHist}>
-            {carregandoHist ? 'Carregando…' : historico ? 'Fechar histórico' : '🗂️ Histórico de lotes'}
+          <button
+            className={'btn-refresh btn-icone' + (historico ? ' ativo' : '')}
+            onClick={alternarHistorico}
+            disabled={carregandoHist}
+            title={historico ? 'Fechar histórico' : 'Histórico de lotes'}
+            aria-label={historico ? 'Fechar histórico de lotes' : 'Abrir histórico de lotes'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M3 11h18" stroke="currentColor" strokeWidth="2" />
+            </svg>
           </button>
         )}
         {total > 0 && <span className="ajuda">{resultados.length}/{total} concluídas</span>}
@@ -322,7 +342,7 @@ export default function ValidacaoIALote() {
               <thead>
                 <tr>
                   <th>Lote</th><th>Data</th><th className="num">Empresas</th>
-                  <th className="num">Com domínio</th><th>Confiança</th><th></th>
+                  <th className="num">Com domínio</th><th>Confiança</th><th>E-mails</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -342,6 +362,14 @@ export default function ValidacaoIALote() {
                         {l.media > 0 && <span className="pill pill-neutro" title="confiança média">{l.media} média</span>}
                         {l.baixa > 0 && <span className="pill pill-erro" title="confiança baixa">{l.baixa} baixa</span>}
                         {!l.alta && !l.media && !l.baixa && <span className="ajuda">—</span>}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="hist-conf">
+                        {l.com_email > 0 && <span className="pill pill-ok" title="empresas com algum e-mail encontrado">✉ {l.com_email}</span>}
+                        {l.com_email_snov > 0 && <span className="pill pill-neutro" title="empresas com e-mail via Snov">snov {l.com_email_snov}</span>}
+                        {l.com_email_apollo > 0 && <span className="pill pill-neutro" title="empresas com e-mail via Apollo">apollo {l.com_email_apollo}</span>}
+                        {!l.com_email && !l.com_email_snov && !l.com_email_apollo && <span className="ajuda">—</span>}
                       </div>
                     </td>
                     <td className="hist-acao">

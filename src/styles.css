@@ -779,3 +779,7 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 /* Saldos das plataformas no topo (Snov, Hunter, Serper, Apollo) */
 .saldos-chips { display: inline-flex; gap: 8px; align-items: center; }
 .saldos-chips .snov-chip { cursor: default; }
+
+/* Botões só-ícone da barra do lote IA */
+.btn-icone { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; }
+.btn-icone.ativo { background: #eef1f6; }
