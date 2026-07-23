@@ -39,8 +39,8 @@ export const sugerirDominios = (nome) => empresasService.sugerirDominios(nome)
 export const validarDominio = (empresa, cnpj) => empresasService.validarDominio(empresa, cnpj)
 export const iniciarValidacaoLote = (loteId, registros) => empresasService.iniciarLote(loteId, registros)
 export const lerValidacoes = (loteId) => empresasService.lerLote(loteId)
-export const validarDominioIA = (razaoSocial, cnpj, loteId) =>
-  empresasService.validarDominioIA(razaoSocial, cnpj, loteId)
+export const validarDominioIA = (razaoSocial, cnpj, loteId, cargos) =>
+  empresasService.validarDominioIA(razaoSocial, cnpj, loteId, cargos)
 export const listarLotesDominio = () => empresasService.listarLotesDominio()
 export const urlCsvLote = (loteId) => empresasService.urlCsvLote(loteId)
 

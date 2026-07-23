@@ -27,6 +27,9 @@ function parseLinhas(texto) {
 
 const CHAVE_STORAGE = 'kard_lote_ia'
 const LOTE_PAGINA = 30 // cards renderizados por "página" da rolagem infinita
+const CHAVE_CARGOS = 'kard_cargos_lote_ia'
+// mesmos cargos-padrão do PainelEmpresa: definem quais contatos interessam nos e-mails por fonte
+const CARGOS_PADRAO = ['RH', 'Recursos Humanos', 'DP', 'Departamento Pessoal', 'Gente e Gestão', 'Financeiro', 'Jurídico', 'Contabilidade']
 
 // Id único por lote: data+hora+sufixo aleatório (ex.: "lote-0723-1432-x7pq").
 // Antes era lote-<qtd de empresas>, que colidia: dois lotes do mesmo tamanho
@@ -50,6 +53,23 @@ export default function ValidacaoIALote() {
   const pararRef = useRef(false)
   const loteIdRef = useRef('') // id do lote em andamento (persistido pra "Continuar lote")
   const [visiveis, setVisiveis] = useState(LOTE_PAGINA) // cards renderizados (rolagem infinita)
+  // cargos-alvo do lote (editável; vai junto em cada validação e filtra os e-mails Snov/Apollo)
+  const [cargos, setCargos] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem(CHAVE_CARGOS) || 'null'); if (Array.isArray(s) && s.length) return s } catch { /* ignora */ }
+    return CARGOS_PADRAO
+  })
+  const [novoCargo, setNovoCargo] = useState('')
+  function salvarCargos(novos) {
+    setCargos(novos)
+    try { localStorage.setItem(CHAVE_CARGOS, JSON.stringify(novos)) } catch { /* ignora */ }
+  }
+  function addCargo() {
+    const t = novoCargo.trim()
+    if (!t) return
+    if (!cargos.some((x) => x.toLowerCase() === t.toLowerCase())) salvarCargos([...cargos, t])
+    setNovoCargo('')
+  }
+  const removerCargo = (t) => salvarCargos(cargos.filter((x) => x !== t))
   const sentinelaRef = useRef(null)
 
   // Rolagem infinita: quando a "sentinela" no fim da lista entra na tela,
@@ -125,7 +145,7 @@ export default function ValidacaoIALote() {
         emVoo.add(alvo)
         persistir()
         try {
-          const r = await validarDominioIA(alvo.empresa, alvo.cnpj, loteId)
+          const r = await validarDominioIA(alvo.empresa, alvo.cnpj, loteId, cargos)
           emVoo.delete(alvo)
           registrar({ ...alvo, ...r })
         } catch (err) {
@@ -166,11 +186,12 @@ export default function ValidacaoIALote() {
   }
 
   function baixarCSV() {
-    const linhas = [['razao_social', 'cnpj', 'dominio', 'linkedin', 'emails', 'score', 'confianca', 'observacao']]
+    const juntar = (v) => (Array.isArray(v) ? v.join(' | ') : v) || ''
+    const linhas = [['razao_social', 'cnpj', 'dominio', 'linkedin', 'emails', 'emails_snov', 'emails_apollo', 'score', 'confianca', 'observacao']]
     for (const r of resultados) {
       linhas.push([
         r.razao_social || r.empresa || '', r.cnpj_informado || r.cnpj || '', r.dominio || '',
-        r.linkedin || '', (Array.isArray(r.emails) ? r.emails.join(' | ') : r.emails) || '',
+        r.linkedin || '', juntar(r.emails), juntar(r.emails_snov), juntar(r.emails_apollo),
         String(r.score ?? ''), r.confianca || '', String(r.observacao || '').replace(/"/g, "'"),
       ])
     }
@@ -229,6 +250,28 @@ export default function ValidacaoIALote() {
             onChange={(e) => setTexto(e.target.value)}
             rows={6}
           />
+        </>
+      )}
+
+      {!rodando && (
+        <>
+          <div className="cargos-alvo">
+            {cargos.map((t) => (
+              <span className="hashtag" key={t}>
+                {t}
+                <button type="button" className="tag-x" title="remover cargo" onClick={() => removerCargo(t)}>×</button>
+              </span>
+            ))}
+            <input
+              className="cargo-add"
+              value={novoCargo}
+              onChange={(ev) => setNovoCargo(ev.target.value)}
+              onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); addCargo() } }}
+              onBlur={addCargo}
+              placeholder="+ cargo"
+            />
+          </div>
+          <small className="ajuda">Esses cargos filtram os <b>e-mails Snov/Apollo</b> de cada empresa validada (fica salvo neste navegador).</small>
         </>
       )}
 
@@ -343,6 +386,22 @@ export default function ValidacaoIALote() {
                   <span className="chave">E-mails</span>
                   <span className="ia-valor">
                     {r.emails.map((em) => <span className="ia-email" key={em}>{em}</span>)}
+                  </span>
+                </div>
+              )}
+              {Array.isArray(r.emails_snov) && r.emails_snov.length > 0 && (
+                <div className="ia-linha">
+                  <span className="chave">Snov</span>
+                  <span className="ia-valor">
+                    {r.emails_snov.map((em) => <span className="ia-email" key={em}>{em}</span>)}
+                  </span>
+                </div>
+              )}
+              {Array.isArray(r.emails_apollo) && r.emails_apollo.length > 0 && (
+                <div className="ia-linha">
+                  <span className="chave">Apollo</span>
+                  <span className="ia-valor">
+                    {r.emails_apollo.map((em) => <span className="ia-email" key={em}>{em}</span>)}
                   </span>
                 </div>
               )}
