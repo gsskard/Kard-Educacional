@@ -137,6 +137,11 @@ export class EmpresasService {
     return `${this.api.base}/lote-dominio-csv?lote_id=${encodeURIComponent(loteId)}`
   }
 
+  // URL de download do CSV com TODAS as validações do banco (todos os lotes).
+  urlCsvTudo() {
+    return `${this.api.base}/lote-dominio-csv-tudo`
+  }
+
   // POST /lote-dominio-apagar — apaga TODAS as linhas do lote na tabela do n8n (irreversível).
   async apagarLote(loteId) {
     const r = await this.api.post('/lote-dominio-apagar', { lote_id: loteId })

@@ -800,3 +800,8 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .ia-textarea::placeholder { color: #a7b0c0; }
 .ia-entrada-rodape { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 .ia-entrada-dica { font-size: 11.5px; }
+
+/* topo do histórico com "baixar tudo" */
+.hist-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+.hist-topo h3 { margin: 0; }
+.hist-tudo { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 12.5px; }

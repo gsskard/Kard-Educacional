@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { validarDominioIA, listarLotesDominio, urlCsvLote, apagarLote } from '../api/n8n'
+import { validarDominioIA, listarLotesDominio, urlCsvLote, urlCsvTudo, apagarLote } from '../api/n8n'
 import CompanyLogo from './CompanyLogo'
 
 // Validação de domínio em lote via IA (workflow n8n post-enriquecer-dominio).
@@ -366,7 +366,16 @@ export default function ValidacaoIALote() {
 
       {historico && (
         <div className="hist-lotes">
-          <h3>Histórico de lotes <span className="hist-qtd">{historico.length}</span></h3>
+          <div className="hist-topo">
+            <h3>Histórico de lotes <span className="hist-qtd">{historico.length}</span></h3>
+            <a className="btn-refresh hist-tudo" href={urlCsvTudo()} title="Baixa um CSV com todas as validações de todos os lotes">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              Baixar tudo (CSV)
+            </a>
+          </div>
           {historico.length === 0 ? (
             <p className="ajuda">Nenhum lote salvo no banco ainda.</p>
           ) : (
