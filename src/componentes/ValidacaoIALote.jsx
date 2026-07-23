@@ -27,6 +27,16 @@ function parseLinhas(texto) {
 
 const CHAVE_STORAGE = 'kard_lote_ia'
 
+// Id único por lote: data+hora+sufixo aleatório (ex.: "lote-0723-1432-x7pq").
+// Antes era lote-<qtd de empresas>, que colidia: dois lotes do mesmo tamanho
+// (ou re-execuções) se misturavam no histórico do banco.
+function gerarLoteId() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  const rand = Math.random().toString(36).slice(2, 6)
+  return `lote-${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}-${rand}`
+}
+
 export default function ValidacaoIALote() {
   const [texto, setTexto] = useState('')
   const [fila, setFila] = useState([])          // empresas ainda não processadas
@@ -37,12 +47,14 @@ export default function ValidacaoIALote() {
   const [historico, setHistorico] = useState(null) // null = fechado; [] = aberto (lista de lotes)
   const [carregandoHist, setCarregandoHist] = useState(false)
   const pararRef = useRef(false)
+  const loteIdRef = useRef('') // id do lote em andamento (persistido pra "Continuar lote")
 
   // Recupera resultados de um lote interrompido (os dados também estão no banco).
   useEffect(() => {
     try {
       const salvo = JSON.parse(localStorage.getItem(CHAVE_STORAGE) || 'null')
       if (salvo?.resultados?.length) {
+        loteIdRef.current = salvo.loteId || ''
         setResultados(salvo.resultados)
         if (salvo.fila?.length) {
           setFila(salvo.fila)
@@ -52,8 +64,8 @@ export default function ValidacaoIALote() {
     } catch { /* storage corrompido: ignora */ }
   }, [])
 
-  function salvarEstado(fila, resultados) {
-    localStorage.setItem(CHAVE_STORAGE, JSON.stringify({ fila, resultados }))
+  function salvarEstado(fila, resultados, loteId) {
+    localStorage.setItem(CHAVE_STORAGE, JSON.stringify({ fila, resultados, loteId }))
   }
 
   function carregarArquivo(ev) {
@@ -66,20 +78,28 @@ export default function ValidacaoIALote() {
 
   // Processa a fila com até `paralelo` requisições ao mesmo tempo.
   // Cada "trabalhador" pega a próxima empresa da fila assim que termina a sua.
-  async function processar(filaInicial, resultadosIniciais) {
+  async function processar(filaInicial, resultadosIniciais, loteId) {
     const PARALELO = paralelo
     setRodando(true)
     pararRef.current = false
     const filaAtual = [...filaInicial]
     let acumulado = [...resultadosIniciais]
     const total = filaAtual.length + acumulado.length
+    const emVoo = new Set() // empresas em requisição agora: contam como "fila" no localStorage
+
+    // Persiste fila + em-voo: se a página recarregar no meio, as empresas cuja
+    // requisição estava em andamento voltam pra fila em vez de sumirem
+    // (era assim que um lote de 408 terminava com 399 no CSV).
+    function persistir() {
+      salvarEstado([...filaAtual, ...emVoo], acumulado, loteId)
+    }
 
     // registra um resultado e atualiza tela/estado (chamado pelos trabalhadores)
     function registrar(item) {
       acumulado = [...acumulado, item]
       setResultados(acumulado)
       setFila([...filaAtual])
-      salvarEstado([...filaAtual], acumulado)
+      persistir()
       setMsg(`Validando… ${acumulado.length}/${total} concluídas (${Math.min(PARALELO, filaAtual.length)} em paralelo).`)
     }
 
@@ -87,14 +107,19 @@ export default function ValidacaoIALote() {
       while (filaAtual.length > 0 && !pararRef.current) {
         const alvo = filaAtual.shift() // remove da fila ANTES de chamar (evita duplicar)
         if (!alvo || !String(alvo.empresa || '').trim()) continue // fila antiga pode ter lixo
+        emVoo.add(alvo)
+        persistir()
         try {
-          const r = await validarDominioIA(alvo.empresa, alvo.cnpj, `lote-${total}`)
+          const r = await validarDominioIA(alvo.empresa, alvo.cnpj, loteId)
+          emVoo.delete(alvo)
           registrar({ ...alvo, ...r })
         } catch (err) {
+          emVoo.delete(alvo)
           const tentativas = (alvo.tentativas || 0) + 1
           if (tentativas <= 2) {
             // falha temporária (timeout/sobrecarga): volta pro FIM da fila e tenta de novo
             filaAtual.push({ ...alvo, tentativas })
+            persistir()
           } else {
             // 3 falhas seguidas: registra o erro no card e segue
             registrar({ ...alvo, score: 0, confianca: 'nenhuma', observacao: 'erro: ' + err.message + ' (3 tentativas)' })
@@ -115,7 +140,8 @@ export default function ValidacaoIALote() {
     const linhas = parseLinhas(texto)
     if (!linhas.length) { setMsg('Cole a lista no formato empresa;cnpj (uma por linha).'); return }
     setResultados([])
-    processar(linhas, [])
+    loteIdRef.current = gerarLoteId()
+    processar(linhas, [], loteIdRef.current)
   }
 
   function novoLote() {
@@ -209,7 +235,7 @@ export default function ValidacaoIALote() {
           </button>
         )}
         {!rodando && fila.length > 0 && (
-          <button className="btn-primario" onClick={() => processar(fila, resultados)}>
+          <button className="btn-primario" onClick={() => { if (!loteIdRef.current) loteIdRef.current = gerarLoteId(); processar(fila, resultados, loteIdRef.current) }}>
             {`Continuar lote (faltam ${fila.length})`}
           </button>
         )}
