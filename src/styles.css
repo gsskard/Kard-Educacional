@@ -789,3 +789,14 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .hist-acao .hist-baixar + .hist-baixar { margin-left: 6px; }
 .hist-apagar { background: transparent; cursor: pointer; }
 .hist-apagar:hover { color: var(--vermelho); background: var(--vermelho-50); }
+
+/* Entrada do lote IA (cartão com upload + textarea) */
+.ia-entrada { background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(30,43,77,.04); }
+.ia-entrada-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.ia-entrada-topo code { background: #eef1f6; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+.ia-entrada-topo .arquivo-label { display: inline-flex; align-items: center; gap: 6px; }
+.ia-textarea { width: 100%; box-sizing: border-box; border: 1px dashed var(--borda); border-radius: 10px; padding: 12px 14px; font: 13px/1.5 ui-monospace, 'Cascadia Code', Consolas, monospace; color: var(--navy); background: #fbfcfe; resize: vertical; min-height: 130px; transition: border-color .15s ease, background .15s ease; }
+.ia-textarea:focus { outline: none; border-color: var(--verde-600); border-style: solid; background: #fff; }
+.ia-textarea::placeholder { color: #a7b0c0; }
+.ia-entrada-rodape { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.ia-entrada-dica { font-size: 11.5px; }

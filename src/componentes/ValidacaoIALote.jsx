@@ -238,31 +238,51 @@ export default function ValidacaoIALote() {
 
   return (
     <div>
-      <p className="ajuda">
-        Cole/suba a lista (<b>empresa;cnpj</b>, uma por linha). O robô valida os domínios via IA
-        (Serper → Snov → Apollo + RDAP) rodando <b>até 10 em paralelo</b> (10 jobs no n8n) e
-        <b> salva cada resultado no banco</b>. Deixe a aba aberta; se fechar, dá pra continuar de onde parou.
-      </p>
-
       {msg && <div className="banner">{msg}</div>}
 
       {!rodando && (
-        <>
-          <div className="lote-entrada">
+        <div className="ia-entrada">
+          <div className="ia-entrada-topo">
+            <div>
+              <strong>Lista de empresas</strong>
+              <span className="ajuda"> — uma por linha, no formato <code>empresa;cnpj</code></span>
+            </div>
             <label className="btn-secundario arquivo-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 15V3m0 0L8 7m4-4l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
               Escolher CSV
               <input type="file" accept=".csv,text/csv,.txt" onChange={carregarArquivo} hidden />
             </label>
-            <span className="ajuda">ou cole abaixo — uma empresa por linha (empresa;cnpj)</span>
           </div>
           <textarea
-            className="lote-textarea"
-            placeholder={'LUKE S ENGENHARIA LTDA;30.678.636/0001-58\nCOAMO AGROINDUSTRIAL COOPERATIVA;75.904.383/0001-21'}
+            className="ia-textarea"
+            placeholder={'Cole aqui ou arraste um CSV…\n\nLUKE S ENGENHARIA LTDA;30.678.636/0001-58\nCOAMO AGROINDUSTRIA COOPERATIVA;75.904.383/0001-21'}
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              const f = e.dataTransfer.files && e.dataTransfer.files[0]
+              if (!f) return
+              const leitor = new FileReader()
+              leitor.onload = () => setTexto(String(leitor.result || ''))
+              leitor.readAsText(f)
+            }}
             rows={6}
           />
-        </>
+          <div className="ia-entrada-rodape">
+            <span className="ajuda">
+              {parseLinhas(texto).length > 0
+                ? <><b>{parseLinhas(texto).length}</b> empresa(s) prontas para validar</>
+                : 'nenhuma empresa lida ainda'}
+            </span>
+            <span className="ajuda ia-entrada-dica">
+              validação por IA (Serper → Snov → Apollo + RDAP) · resultados salvos no banco · se fechar a aba, dá pra continuar
+            </span>
+          </div>
+        </div>
       )}
 
       {!rodando && (
