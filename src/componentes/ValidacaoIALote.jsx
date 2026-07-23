@@ -26,6 +26,7 @@ function parseLinhas(texto) {
 }
 
 const CHAVE_STORAGE = 'kard_lote_ia'
+const LOTE_PAGINA = 30 // cards renderizados por "página" da rolagem infinita
 
 // Id único por lote: data+hora+sufixo aleatório (ex.: "lote-0723-1432-x7pq").
 // Antes era lote-<qtd de empresas>, que colidia: dois lotes do mesmo tamanho
@@ -48,6 +49,20 @@ export default function ValidacaoIALote() {
   const [carregandoHist, setCarregandoHist] = useState(false)
   const pararRef = useRef(false)
   const loteIdRef = useRef('') // id do lote em andamento (persistido pra "Continuar lote")
+  const [visiveis, setVisiveis] = useState(LOTE_PAGINA) // cards renderizados (rolagem infinita)
+  const sentinelaRef = useRef(null)
+
+  // Rolagem infinita: quando a "sentinela" no fim da lista entra na tela,
+  // renderiza mais uma página de cards (renderizar 400+ de uma vez trava o front).
+  useEffect(() => {
+    const el = sentinelaRef.current
+    if (!el) return
+    const obs = new IntersectionObserver((entradas) => {
+      if (entradas[0].isIntersecting) setVisiveis((v) => v + LOTE_PAGINA)
+    }, { rootMargin: '600px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [resultados.length, visiveis])
 
   // Recupera resultados de um lote interrompido (os dados também estão no banco).
   useEffect(() => {
@@ -147,7 +162,7 @@ export default function ValidacaoIALote() {
   function novoLote() {
     pararRef.current = true
     localStorage.removeItem(CHAVE_STORAGE)
-    setFila([]); setResultados([]); setTexto(''); setMsg('')
+    setFila([]); setResultados([]); setTexto(''); setMsg(''); setVisiveis(LOTE_PAGINA)
   }
 
   function baixarCSV() {
