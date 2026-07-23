@@ -136,6 +136,12 @@ export class EmpresasService {
   urlCsvLote(loteId) {
     return `${this.api.base}/lote-dominio-csv?lote_id=${encodeURIComponent(loteId)}`
   }
+
+  // POST /lote-dominio-apagar — apaga TODAS as linhas do lote na tabela do n8n (irreversível).
+  async apagarLote(loteId) {
+    const r = await this.api.post('/lote-dominio-apagar', { lote_id: loteId })
+    return typeof r === 'string' ? JSON.parse(r) : (r || {})
+  }
 }
 
 export const empresasService = new EmpresasService()

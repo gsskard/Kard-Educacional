@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { validarDominioIA, listarLotesDominio, urlCsvLote } from '../api/n8n'
+import { validarDominioIA, listarLotesDominio, urlCsvLote, apagarLote } from '../api/n8n'
 import CompanyLogo from './CompanyLogo'
 
 // Validação de domínio em lote via IA (workflow n8n post-enriquecer-dominio).
@@ -216,6 +216,18 @@ export default function ValidacaoIALote() {
     }
   }
 
+  // Apaga um lote inteiro do banco (com confirmação) e atualiza a lista.
+  async function apagarDoHistorico(l) {
+    if (!window.confirm(`Apagar o lote "${l.lote_id}" (${l.empresas} empresa(s)) do banco? Não dá pra desfazer.`)) return
+    try {
+      await apagarLote(l.lote_id)
+      setHistorico((prev) => (prev || []).filter((x) => x.lote_id !== l.lote_id))
+      setMsg(`Lote "${l.lote_id}" apagado.`)
+    } catch (err) {
+      setMsg('Não deu pra apagar: ' + err.message)
+    }
+  }
+
   // "2026-07-23T12:17:57..." → "23/07/2026 12:17"
   function dataCurta(iso) {
     const m = String(iso || '').match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/)
@@ -379,6 +391,12 @@ export default function ValidacaoIALote() {
                           <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                       </a>
+                      <button type="button" className="hist-baixar hist-apagar" onClick={() => apagarDoHistorico(l)} title="Apagar este lote do banco (não dá pra desfazer)" aria-label={`Apagar lote ${l.lote_id}`}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m3 0l-.8 12a2 2 0 01-2 1.9H8.8a2 2 0 01-2-1.9L6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))}

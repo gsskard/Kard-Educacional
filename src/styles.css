@@ -783,3 +783,9 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 /* Botões só-ícone da barra do lote IA */
 .btn-icone { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; }
 .btn-icone.ativo { background: #eef1f6; }
+
+/* botão de apagar lote no histórico */
+.hist-acao { white-space: nowrap; }
+.hist-acao .hist-baixar + .hist-baixar { margin-left: 6px; }
+.hist-apagar { background: transparent; cursor: pointer; }
+.hist-apagar:hover { color: var(--vermelho); background: var(--vermelho-50); }
