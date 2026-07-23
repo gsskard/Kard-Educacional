@@ -229,24 +229,38 @@ export default function ValidacaoIALote() {
       </div>
 
       {historico && (
-        <div className="lote-card" style={{ marginTop: 12 }}>
-          <h3 style={{ margin: '0 0 8px' }}>Histórico de lotes ({historico.length})</h3>
+        <div className="hist-lotes">
+          <h3>Histórico de lotes <span className="hist-qtd">{historico.length}</span></h3>
           {historico.length === 0 ? (
             <p className="ajuda">Nenhum lote salvo no banco ainda.</p>
           ) : (
-            <table className="tabela" style={{ width: '100%' }}>
+            <table className="hist-tabela">
               <thead>
-                <tr><th>Lote</th><th>Data</th><th>Empresas</th><th>Com domínio</th><th>Alta / Média / Baixa</th><th></th></tr>
+                <tr>
+                  <th>Lote</th><th>Data</th><th className="num">Empresas</th>
+                  <th className="num">Com domínio</th><th>Confiança</th><th></th>
+                </tr>
               </thead>
               <tbody>
                 {historico.map((l) => (
                   <tr key={l.lote_id}>
-                    <td>{l.lote_id}</td>
-                    <td>{dataCurta(l.inicio)}</td>
-                    <td>{l.empresas}</td>
-                    <td>{l.com_dominio}</td>
-                    <td>{l.alta} / {l.media} / {l.baixa}</td>
-                    <td><a className="btn-refresh" href={urlCsvLote(l.lote_id)}>Baixar CSV</a></td>
+                    <td className="hist-nome">{l.lote_id}</td>
+                    <td className="hist-data">{dataCurta(l.inicio)}</td>
+                    <td className="num">{l.empresas}</td>
+                    <td className="num">
+                      {l.com_dominio > 0
+                        ? <span className="pill pill-ok">{l.com_dominio}</span>
+                        : <span className="pill pill-neutro">0</span>}
+                    </td>
+                    <td className="hist-conf">
+                      {l.alta > 0 && <span className="pill pill-ok" title="confiança alta">{l.alta} alta</span>}
+                      {l.media > 0 && <span className="pill pill-neutro" title="confiança média">{l.media} média</span>}
+                      {l.baixa > 0 && <span className="pill pill-erro" title="confiança baixa">{l.baixa} baixa</span>}
+                      {!l.alta && !l.media && !l.baixa && <span className="ajuda">—</span>}
+                    </td>
+                    <td className="hist-acao">
+                      <a className="hist-baixar" href={urlCsvLote(l.lote_id)} title="Baixar o resultado completo deste lote">⬇ CSV</a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
