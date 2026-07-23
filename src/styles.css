@@ -765,3 +765,13 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .hist-baixar { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--borda); border-radius: 10px; text-decoration: none; color: var(--muted); transition: transform .12s ease, box-shadow .12s ease, color .12s ease; }
 .hist-baixar:hover { color: inherit; }
 .hist-baixar:hover { background: #f1f4f9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30,43,77,.08); }
+
+/* Linhas de detalhe dos cards do lote IA: rótulo fixo à esquerda, valor fluido
+   (sem space-between — evita o rótulo quebrar em "E-\nmails" e a linha pontilhada
+   cortando o conteúdo quando o valor é longo) */
+.ia-linha { display: flex; align-items: baseline; gap: 12px; font-size: 13px; padding: 7px 0; border-top: 1px dashed var(--borda); margin-top: 8px; }
+.ia-linha .chave { color: var(--muted); flex: none; min-width: 58px; }
+.ia-valor { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ia-email { display: block; }
+.ia-link { color: var(--verde-600); text-decoration: none; word-break: break-all; }
+.ia-link:hover { text-decoration: underline; }

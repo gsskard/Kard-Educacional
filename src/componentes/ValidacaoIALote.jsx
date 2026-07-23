@@ -298,10 +298,20 @@ export default function ValidacaoIALote() {
                 {r.observacao && <span className="ia-just">{r.observacao}</span>}
               </div>
               {Array.isArray(r.emails) && r.emails.length > 0 && r.emails[0] !== '-' && (
-                <div className="empresa-linha"><span className="chave">E-mails</span><span>{r.emails.join(', ')}</span></div>
+                <div className="ia-linha">
+                  <span className="chave">E-mails</span>
+                  <span className="ia-valor">
+                    {r.emails.map((em) => <span className="ia-email" key={em}>{em}</span>)}
+                  </span>
+                </div>
               )}
               {r.linkedin && r.linkedin !== '-' && (
-                <div className="empresa-linha"><span className="chave">LinkedIn</span><a href={r.linkedin} target="_blank" rel="noreferrer">{r.linkedin}</a></div>
+                <div className="ia-linha">
+                  <span className="chave">LinkedIn</span>
+                  <a className="ia-valor ia-link" href={r.linkedin} target="_blank" rel="noreferrer">
+                    {(() => { try { return decodeURI(r.linkedin) } catch { return r.linkedin } })().replace(/^https?:\/\/(www\.)?/, '')}
+                  </a>
+                </div>
               )}
             </div>
           ))}

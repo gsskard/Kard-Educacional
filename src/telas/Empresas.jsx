@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, descobrirRapido, salvarEmpresa, ocultarEmpresa, sugerirDominios, rhRevelar } from '../api/n8n'
+import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, salvarEmpresa, ocultarEmpresa, sugerirDominios, rhRevelar } from '../api/n8n'
 import CompanyLogo from '../componentes/CompanyLogo'
 import ValidacaoIALote from '../componentes/ValidacaoIALote'
 import PainelEmpresa from '../componentes/PainelEmpresa'
@@ -141,221 +141,10 @@ function PillEmail({ valido }) {
   return <span className="pill pill-neutro">?</span>
 }
 
-// -------------------------------------------------------------------------
-// Validação de domínio em lote
-// Sobe um CSV com CNPJ / nome de empresa; para cada linha o n8n devolve os
-// domínios candidatos (com a contagem de e-mails do Hunter — grátis), a logo
-// e o palpite da IA (qual domínio é o corporativo mais provável + %).
-// O analista escolhe o certo e clica "enriquecer" só nesse (aí sim gasta cota).
-// -------------------------------------------------------------------------
-
-// Reduz uma URL/site a só o host (tira https://, www e o caminho): a Snov
-// e o rh-preview esperam o domínio "pelado" (ex.: magazineluiza.com.br).
-function soHost(v) {
-  let s = String(v || '').trim().toLowerCase()
-  if (!s) return ''
-  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '')
-  s = s.split('/')[0].split('?')[0].split('#')[0]
-  return s.trim()
-}
-
-// Lê um CSV simples (delimitador , ou ;). Aceita cabeçalho com colunas
-// empresa/nome/razão social, cnpj e — opcional — site/domínio; sem cabeçalho,
-// adivinha pelas colunas (CNPJ pelos dígitos, domínio pelo ponto sem espaço).
-function parseCSV(texto) {
-  const linhas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  if (!linhas.length) return []
-  const delim = (linhas[0].match(/;/g) || []).length > (linhas[0].match(/,/g) || []).length ? ';' : ','
-  const split = (l) => l.split(delim).map((c) => c.replace(/^"|"$/g, '').trim())
-  const norm = (h) => h.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
-  const head = split(linhas[0]).map(norm)
-  const colsEmp = ['empresa', 'nome', 'razaosocial', 'cliente', 'empregador']
-  const colsDom = ['dominio', 'site', 'url', 'website', 'link', 'dominiocorporativo', 'pagina']
-  const temHeader = head.some((h) => colsEmp.includes(h) || h === 'cnpj' || colsDom.includes(h))
-  let idxEmp = -1, idxCnpj = -1, idxDom = -1
-  if (temHeader) {
-    idxEmp = head.findIndex((h) => colsEmp.includes(h))
-    idxCnpj = head.findIndex((h) => h === 'cnpj')
-    idxDom = head.findIndex((h) => colsDom.includes(h))
-  }
-  const corpo = temHeader ? linhas.slice(1) : linhas
-  const out = []
-  for (const l of corpo) {
-    const cols = split(l)
-    let empresa = '', cnpj = '', dominio = ''
-    if (temHeader) {
-      empresa = idxEmp >= 0 ? (cols[idxEmp] || '') : ''
-      cnpj = idxCnpj >= 0 ? (cols[idxCnpj] || '') : ''
-      dominio = idxDom >= 0 ? soHost(cols[idxDom]) : ''
-    } else {
-      const cnpjCol = cols.find((c) => c.replace(/\D/g, '').length >= 11)
-      cnpj = cnpjCol || ''
-      // domínio = coluna com ponto, sem espaço, que não seja o CNPJ
-      const domCol = cols.find((c) => c !== cnpjCol && /\./.test(c) && !/\s/.test(c) && c.replace(/\D/g, '').length < 11)
-      dominio = soHost(domCol)
-      // nome = coluna que não é o CNPJ nem o domínio E não parece um CNPJ (evita
-      // usar "01.105.558/0001-02" como nome quando só o CNPJ foi colado).
-      empresa = cols.find((c) => c && c !== cnpjCol && c !== domCol && c.replace(/\D/g, '').length < 11) || ''
-    }
-    // aceita a linha se tiver ao menos um identificador (nome, CNPJ ou domínio).
-    if (empresa || cnpj || dominio) out.push({ empresa, cnpj, dominio })
-  }
-  return out
-}
-
-// Descoberta rápida (IA + Snov): pula a validação da ReceitaWS (o gargalo de 3/min),
-// então roda em PARALELO. Para cada empresa o robô acha o domínio (Snov máx 3 + RDAP + IA)
-// e já lista o RH (grátis). No fim, auto-libera até 3 RH das empresas ≥60% (pago).
-// Não mexe no fluxo do time (rota separada rh-descobrir-rapido).
-function DescobertaRapida({ onEnriquecido, irParaEmpresas }) {
-  const [texto, setTexto] = useState('')
-  const [arquivo, setArquivo] = useState('')
-  const [entrada, setEntrada] = useState([])
-  const [rodando, setRodando] = useState(false)
-  const [res, setRes] = useState([])            // [{empresa,cnpj,status,rh,dominio,score,robo,msg}]
-  const [msg, setMsg] = useState('')
-  const [prog, setProg] = useState({ n: 0, total: 0 })
-  const [autoLib, setAutoLib] = useState(true)  // auto-liberar 3 RH (≥60%) ao final
-  const CONC = 3                                // consultas paralelas (sem ReceitaWS). 1 worker n8n → 3 evita saturar
-
-  function lerArquivo(ev) {
-    const f = ev.target.files && ev.target.files[0]; if (!f) return
-    setArquivo(f.name)
-    const leitor = new FileReader()
-    leitor.onload = () => { setEntrada(parseCSV(String(leitor.result || ''))); setTexto('') }
-    leitor.readAsText(f)
-  }
-
-  const digits = (s) => String(s || '').replace(/\D/g, '')
-
-  // Após listar tudo, revela até 3 RH das empresas ≥60% (lê os scores atualizados do banco).
-  async function autoLiberarPos(processadas) {
-    try {
-      setMsg('Verificando confiança para auto-liberar RH (≥60%)…')
-      const todas = await listarEmpresas()
-      const alvoCnpjs = new Set(processadas.map((p) => digits(p.cnpj)).filter(Boolean))
-      const alvos = todas
-        .filter((e) => e.cnpj && alvoCnpjs.has(digits(e.cnpj)))
-        .map((e) => ({ e, q: faltaLiberarRh(e) }))
-        .filter((x) => x.q > 0)
-      if (!alvos.length) { setMsg((m) => m + ' — nada elegível p/ auto-liberar (≥60%).'); return }
-      const fila = alvos.slice(); let k = 0
-      const worker = async () => {
-        while (fila.length) {
-          const { e, q } = fila.shift()
-          setMsg(`Liberando RH ${++k}/${alvos.length}: ${e.empresa} (até ${q})…`)
-          try { await rhRevelar(e.cnpj, [], 'primeiros_n', q) } catch { /* segue */ }
-        }
-      }
-      await Promise.all(Array.from({ length: Math.min(4, fila.length) }, worker))
-      setMsg(`Auto-liberação concluída em ${alvos.length} empresa(s) ≥60%.`)
-      if (onEnriquecido) onEnriquecido()
-    } catch (err) { setMsg('Auto-liberar falhou: ' + err.message) }
-  }
-
-  async function rodar() {
-    if (!entrada.length || rodando) return
-    setRodando(true); setRes([]); setMsg(''); setProg({ n: 0, total: entrada.length })
-    const fila = entrada.map((r, i) => ({ r, i }))
-    const saida = new Array(entrada.length)
-    let done = 0
-    const worker = async () => {
-      while (fila.length) {
-        const { r, i } = fila.shift()
-        try {
-          const d = await descobrirRapido(r.empresa, r.cnpj)
-          const prospects = Array.isArray(d) ? d : ((d && (d.prospects || d.data)) || [])
-          saida[i] = {
-            empresa: r.empresa, cnpj: r.cnpj,
-            status: prospects.length ? 'ok' : 'vazio',
-            rh: prospects.length,
-            dominio: (d && d.dominio) || r.dominio || '',
-            score: d && (d.dominio_score != null ? d.dominio_score : null),
-            robo: !!(d && (d.dominio_por_robo || d.por_robo)),
-          }
-        } catch (err) {
-          saida[i] = { empresa: r.empresa, cnpj: r.cnpj, status: 'erro', msg: err.message }
-        }
-        done++; setProg({ n: done, total: entrada.length })
-        setRes(saida.filter(Boolean).slice())
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(CONC, fila.length) }, worker))
-    const ok = saida.filter((x) => x && x.status === 'ok').length
-    setMsg(`Descoberta concluída: ${ok} listada(s) de ${entrada.length}.`)
-    if (onEnriquecido) onEnriquecido()
-    if (autoLib) await autoLiberarPos(entrada)
-    setRodando(false)
-  }
-
-  const pct = prog.total ? Math.round((100 * prog.n) / prog.total) : 0
-
-  return (
-    <div className="descoberta-rapida">
-      <p className="ajuda lote-intro">
-        <b>Descoberta rápida</b>: cole/suba a lista (nome + CNPJ; site é opcional). O robô acha o
-        domínio por <b>IA + Snov</b> (sem a espera da Receita) e lista o RH — tudo <b>em paralelo</b>,
-        então 400 empresas levam minutos. No fim, <b>libera automaticamente até 3 RH</b> das empresas
-        com confiança de domínio <b>≥60%</b> (gasta crédito Snov só nessas).
-      </p>
-      <div className="lote-entrada">
-        <label className="btn-refresh arquivo-btn">
-          Escolher CSV<input type="file" accept=".csv,text/csv,text/plain" onChange={lerArquivo} hidden />
-        </label>
-        {arquivo && <span className="arquivo-nome">{arquivo}</span>}
-        <span className="lote-ou">ou cole abaixo — uma empresa por linha (empresa;cnpj;site)</span>
-      </div>
-      <textarea
-        className="lote-textarea" rows={5} placeholder={'Magazine Luiza;47.960.950/0001-21\nO Boticário;;\nEmpresa X;;empresax.com.br'}
-        value={texto} disabled={rodando}
-        onChange={(e) => { setTexto(e.target.value); setEntrada(parseCSV(e.target.value)); setArquivo('') }}
-      />
-      <div className="lote-barra-acoes">
-        <label className="chk-autolib" title="Ao terminar, libera até 3 RH por empresa com domínio ≥60%">
-          <input type="checkbox" checked={autoLib} disabled={rodando} onChange={(e) => setAutoLib(e.target.checked)} />
-          auto-liberar 3 RH (≥60%) ao final
-        </label>
-        <button className="btn-primario" onClick={rodar} disabled={!entrada.length || rodando}>
-          {rodando ? 'Rodando…' : `⚡ Rodar descoberta rápida${entrada.length ? ` (${entrada.length})` : ''}`}
-        </button>
-      </div>
-      {(rodando || prog.n > 0) && (
-        <div className="dr-prog">
-          <div className="barra"><div className="barra-fill" style={{ width: pct + '%' }} /></div>
-          <small>{prog.n}/{prog.total}</small>
-        </div>
-      )}
-      {msg && <div className="ajuda dr-msg">{msg}</div>}
-      {res.length > 0 && (
-        <table className="preview dr-tabela">
-          <thead><tr><th>Empresa</th><th>Domínio</th><th className="col-cen">Contatos</th><th className="col-cen">Status</th></tr></thead>
-          <tbody>
-            {res.map((r, i) => (
-              <tr key={(r.cnpj || '') + r.empresa + i}>
-                <td><span className="empresa-cel"><CompanyLogo dominio={r.dominio} nome={r.empresa} size={20} />{nomeProprio(r.empresa) || '—'}</span></td>
-                <td>{r.dominio || '—'}{r.robo && <span className="selo-robo">🤖 robô</span>}{r.score != null && <span className="dr-score"> · {r.score}%</span>}</td>
-                <td className="col-cen">{r.status === 'ok' ? r.rh : '—'}</td>
-                <td className="col-cen">
-                  {r.status === 'ok' ? <span className="pill pill-ok">listado</span>
-                    : r.status === 'vazio' ? <span className="pill pill-neutro">sem RH</span>
-                    : <span className="pill pill-erro" title={r.msg}>erro</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {res.some((r) => r.status === 'ok') && !rodando && (
-        <p className="ajuda">Pronto — os domínios e o selo 🤖 aparecem na aba <b onClick={irParaEmpresas} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Empresas enriquecidas</b> (clique em Atualizar).</p>
-      )}
-    </div>
-  )
-}
-
 // Tela de Empresas (RF-09/10/33/37): empresas enriquecidas via Hunter —
 // logo, CNPJ, domínio/site, localização, nº de funcionários, categoria e os
 // e-mails de RH com cargo/validade. Duas visões: Cartões e Tabela (tipo Excel).
-// Abas extras: Descoberta rápida (IA + Snov) e Validar domínios em lote (IA).
+// Aba extra: Validar domínios em lote (IA).
 
 export default function Empresas() {
   const [rows, setRows] = useState([])
@@ -648,14 +437,11 @@ export default function Empresas() {
 
       <div className="view-toggle abas-topo">
         <button className={aba === 'empresas' ? 'ativo' : ''} onClick={() => setAba('empresas')}>Empresas enriquecidas</button>
-        <button className={aba === 'rapida' ? 'ativo' : ''} onClick={() => setAba('rapida')}>⚡ Descoberta rápida (IA + Snov)</button>
         <button className={aba === 'ia' ? 'ativo' : ''} onClick={() => setAba('ia')}>⚡ Validar domínios em lote (IA)</button>
       </div>
 
       {aba === 'ia' ? (
         <ValidacaoIALote />
-      ) : aba === 'rapida' ? (
-        <DescobertaRapida onEnriquecido={carregar} irParaEmpresas={() => setAba('empresas')} />
       ) : (
       <>
       <p className="ajuda">Empresas enriquecidas via Snov.io: domínio, site, localização, porte, categoria, logo e e-mails de RH com cargo (RF-09/10/37).</p>
