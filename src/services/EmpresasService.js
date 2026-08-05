@@ -37,7 +37,28 @@ export class EmpresasService {
     const cab = linhas[0]
     const idx = (nome) => cab.indexOf(nome)
     const col = (l, nome) => { const i = idx(nome); return i >= 0 ? (l[i] || '') : '' }
-    const contar = (v) => v ? v.split('|').join(',').split(',').map((x) => x.trim()).filter(Boolean).length : 0
+    const partes = (v) => v ? v.split('|').join(',').split(',').map((x) => x.trim()).filter(Boolean) : []
+    // Monta contatos no formato do painel ({nome,cargo,email,eh_rh,eh_socio}) a partir
+    // dos e-mails da validação — sem id (nada a "desbloquear": o e-mail já está aberto).
+    const montarContatos = (l) => {
+      const vistos = new Set()
+      const out = []
+      const add = (email, extra) => {
+        const e = String(email || '').toLowerCase()
+        if (!e || !e.includes('@') || vistos.has(e)) return
+        vistos.add(e)
+        out.push({ nome: '', cargo: '', email: e, eh_rh: false, eh_socio: false, ...extra })
+      }
+      for (const em of partes(col(l, 'emails_snov'))) add(em, { cargo: 'Snov · cargo-alvo', eh_rh: true })
+      for (const em of partes(col(l, 'emails'))) add(em, { cargo: 'E-mail público' })
+      for (const em of partes(col(l, 'emails_novavida'))) add(em, { cargo: 'Receita/NovaVida' })
+      for (const s of partes(col(l, 'emails_socios'))) {
+        const m = s.match(/^(.*?)\s*<([^>]+)>$/)
+        if (m) add(m[2], { nome: m[1], cargo: 'Sócio', eh_socio: true })
+        else add(s, { cargo: 'Sócio', eh_socio: true })
+      }
+      return out
+    }
     const vistos = new Set()
     const out = []
     for (const l of linhas.slice(1)) {
@@ -47,7 +68,9 @@ export class EmpresasService {
       const cidade = col(l, 'cidade'), uf = col(l, 'uf')
       const criado = col(l, 'criado_em')
       const m = criado.match(/(\d{4})-(\d{2})-(\d{2})/)
+      const contatos = montarContatos(l)
       out.push({
+        rh_contatos: contatos,
         cnpj,
         empresa: col(l, 'nome_fantasia') || col(l, 'razao_social_oficial') || col(l, 'razao_social'),
         dominio: col(l, 'dominio') === '-' ? '' : col(l, 'dominio'),
@@ -56,9 +79,9 @@ export class EmpresasService {
         categoria: col(l, 'descricao_cnae'),
         porte: col(l, 'porte'),
         capital_social: col(l, 'capital_social'),
-        total_prospects: contar(col(l, 'emails')) + contar(col(l, 'emails_snov')),
-        total_rh: contar(col(l, 'emails_snov')),
-        revelados: contar(col(l, 'emails_snov')),
+        total_prospects: contatos.filter((c) => !c.eh_socio).length,
+        total_rh: contatos.filter((c) => c.eh_rh).length,
+        revelados: contatos.filter((c) => !c.eh_socio).length,
         dominio_score: Number(col(l, 'score')) || 0,
         dominio_confere: col(l, 'caso') === 'A',
         enriquecido_em: m ? `${m[3]}/${m[2]}/${m[1]}` : '',
