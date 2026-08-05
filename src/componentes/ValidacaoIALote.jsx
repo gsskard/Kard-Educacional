@@ -185,15 +185,30 @@ export default function ValidacaoIALote() {
     setFila([]); setResultados([]); setTexto(''); setMsg(''); setVisiveis(LOTE_PAGINA)
   }
 
+  // Mesmas colunas (e ordem) dos CSVs do histórico gerados pelo n8n — se mudar lá,
+  // mudar aqui junto. Campos de lista (emails*, telefones, socios) viram texto separado.
+  const COLS_CSV = ['lote_id', 'razao_social', 'razao_social_oficial', 'nome_fantasia', 'cnpj', 'nv_status',
+    'situacao_cadastral', 'porte', 'cidade', 'uf', 'cnae', 'descricao_cnae', 'data_abertura', 'capital_social',
+    'faturamento_presumido', 'qtde_funcionarios', 'dominio', 'linkedin', 'emails', 'emails_snov', 'emails_apollo',
+    'emails_novavida', 'emails_socios', 'telefone_principal', 'telefones', 'qtd_socios', 'socios',
+    'fonte_dominio', 'registrante_rdap', 'caso', 'score', 'score_nv', 'confianca', 'observacao', 'criado_em']
+  const COLS_LISTA = ['emails', 'emails_snov', 'emails_apollo', 'emails_novavida', 'emails_socios', 'telefones', 'socios']
+
   function baixarCSV() {
-    const juntar = (v) => (Array.isArray(v) ? v.join(' | ') : v) || ''
-    const linhas = [['razao_social', 'cnpj', 'dominio', 'linkedin', 'emails', 'emails_snov', 'emails_apollo', 'score', 'confianca', 'observacao']]
+    const juntar = (v) => {
+      if (Array.isArray(v)) return v.join(' | ')
+      if (typeof v === 'string') { try { const a = JSON.parse(v); if (Array.isArray(a)) return a.join(' | ') } catch { /* não é lista */ } }
+      return v == null ? '' : String(v)
+    }
+    const linhas = [COLS_CSV]
     for (const r of resultados) {
-      linhas.push([
-        r.razao_social || r.empresa || '', r.cnpj_informado || r.cnpj || '', r.dominio || '',
-        r.linkedin || '', juntar(r.emails), juntar(r.emails_snov), juntar(r.emails_apollo),
-        String(r.score ?? ''), r.confianca || '', String(r.observacao || '').replace(/"/g, "'"),
-      ])
+      linhas.push(COLS_CSV.map((c) => {
+        if (c === 'razao_social') return r.razao_social || r.empresa || ''
+        if (c === 'cnpj') return r.cnpj_informado || r.cnpj || ''
+        if (c === 'observacao') return String(r.observacao || '').replace(/"/g, "'")
+        if (COLS_LISTA.includes(c)) return juntar(r[c])
+        return r[c] == null ? '' : String(r[c])
+      }))
     }
     // ﻿ (BOM) + \r\n: sem o BOM o Excel abre UTF-8 como Latin-1 e os acentos viram "DomÃ­nio"
     const csv = linhas.map((l) => l.map((c) => `"${String(c)}"`).join(';')).join('\r\n')

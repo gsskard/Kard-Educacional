@@ -117,7 +117,7 @@ export class EmpresasService {
     // o webhook responde texto JSON; o ApiClient já parseia, mas garantimos objeto
     const dados = typeof r === 'string' ? JSON.parse(r) : (r || {})
     // emails/emails_snov/emails_apollo vêm como texto JSON (formato da tabela do n8n) — viram lista
-    for (const campo of ['emails', 'emails_snov', 'emails_apollo']) {
+    for (const campo of ['emails', 'emails_snov', 'emails_apollo', 'emails_novavida', 'emails_socios', 'telefones', 'socios']) {
       if (typeof dados[campo] === 'string') {
         try { dados[campo] = JSON.parse(dados[campo]) } catch { dados[campo] = [] }
       }
