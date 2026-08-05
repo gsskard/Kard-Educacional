@@ -10,6 +10,7 @@ import { cobrancaService } from '../services/CobrancaService'
 import { listasService } from '../services/ListasService'
 import { empresasService } from '../services/EmpresasService'
 import { rhService } from '../services/RhService'
+import { obitosService } from '../services/ObitosService'
 
 // --- Cobrança / contatos ---
 export const listarContatos = () => cobrancaService.listarContatos()
@@ -59,3 +60,6 @@ export function listarEventos() {
 }
 
 export const API = api.base
+
+// --- Óbitos / consulta cadastral por CPF (Nova Vida NVCheck) ---
+export const nvCheckCpf = (cpf) => obitosService.consultarCpf(cpf)

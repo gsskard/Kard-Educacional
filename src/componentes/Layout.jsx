@@ -11,6 +11,7 @@ const MENU = [
   { rota: 'cobranca', label: 'Cobrança' },
   { rota: 'contatos', label: 'Contatos' },
   { rota: 'empresas', label: 'Empresas' },
+  { rota: 'obitos', label: 'Óbitos' },
 ]
 
 function Logo() {
