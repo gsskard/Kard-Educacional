@@ -97,16 +97,45 @@ export default function Contatos() {
     return m
   }, [empresas])
 
+  // Contatos vindos da validação por IA (tabela enriquecimento_dominio): as empresas
+  // dessa fonte trazem rh_contatos sintetizados (Snov/sócios/NovaVida) sem id.
+  // Entram na lista com id derivado do e-mail, sem duplicar quem já está na base.
+  const sinteticos = useMemo(() => {
+    const emailsBase = new Set(rows.map((r) => String(r.email || '').toLowerCase()).filter(Boolean))
+    const out = []
+    for (const e of empresas) {
+      if (e.fonte !== 'validacao_ia') continue
+      for (const c of e.rh_contatos || []) {
+        const email = String(c.email || '').toLowerCase()
+        if (!email || emailsBase.has(email)) continue
+        emailsBase.add(email)
+        out.push({
+          id: 'ia-' + email,
+          nome: c.nome || '',
+          cargo: c.cargo || '',
+          empresa: e.empresa,
+          cnpj: e.cnpj,
+          dominio: e.dominio,
+          email,
+          eh_rh: c.eh_rh === true,
+          eh_socio: c.eh_socio === true,
+        })
+      }
+    }
+    return out
+  }, [rows, empresas])
+
   const visiveis = useMemo(() => {
     // só contatos com e-mail desbloqueado
     // sócios (QSA/Receita) sempre aparecem, mesmo sem e-mail próprio
-    const comEmail = rows.filter((r) => r.eh_socio || (r.email && String(r.email).trim()))
+    const todos = [...rows, ...sinteticos]
+    const comEmail = todos.filter((r) => r.eh_socio || (r.email && String(r.email).trim()))
     const q = busca.trim().toLowerCase()
     if (!q) return comEmail
     return comEmail.filter((r) =>
       [r.nome, r.cargo, r.empresa, r.cnpj, r.email].some((c) => String(c || '').toLowerCase().includes(q))
     )
-  }, [rows, busca])
+  }, [rows, sinteticos, busca])
 
   // Importa uma base de contatos (CSV) e salva no banco (rh_enriquecimento) via n8n.
   async function importarArquivo(ev) {
@@ -208,43 +237,45 @@ export default function Contatos() {
       </div>
 
       {loading ? <div className="loading">Carregando…</div> : (
-        <table className="preview">
-          <thead>
-            <tr>
-              <th></th><th>Nome</th><th className="col-cen">Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
-              <th>Enriquecimento</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {visiveis.map((r, i) => {
-              const emp = empresaPorNome.get(chave(r.empresa))
-              return (
-                <tr key={r.id ?? i} className={r.empresa ? 'linha-clicavel' : ''} onClick={r.empresa ? () => setEmpresaAberta(r.empresa) : undefined} title={r.empresa ? 'Ver empresa' : undefined}>
-                  <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
-                  <td>
-                    <div className="contato-nome">
-                      <strong>{nomeProprio(r.nome) || '—'}{r.eh_socio && <span className="tag-socio-mini">SÓCIO</span>}</strong>
-                      {r.cargo && <small className="contato-cargo">{r.cargo}</small>}
-                    </div>
-                  </td>
-                  <td className="col-cen" title={nomeProprio(r.empresa)}>
-                    <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={28} />
-                  </td>
-                  <td>{formatarCnpj(r.cnpj) || '—'}</td>
-                  <td>{r.dominio || '—'}</td>
-                  <td>{r.email || '—'}</td>
-                  <td>
-                    {emp
-                      ? <span className="pill pill-ok">enriquecida{emp.enriquecido_em ? ' ' + emp.enriquecido_em : ''}</span>
-                      : <span className="ajuda">não</span>}
-                  </td>
-                  <td onClick={(ev) => ev.stopPropagation()}><button className="btn-mini" onClick={() => enriquecerEmpresasDe([r])}>enriquecer</button></td>
-                </tr>
-              )
-            })}
-            {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhum contato.</td></tr>}
-          </tbody>
-        </table>
+        <div className="tabela-rolagem">
+          <table className="preview contatos-tabela">
+            <thead>
+              <tr>
+                <th className="col-sel"></th><th>Nome</th><th className="col-cen">Empresa</th><th>CNPJ</th><th>Domínio</th><th>E-mail</th>
+                <th>Enriquecida</th><th className="col-sel"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiveis.map((r, i) => {
+                const emp = empresaPorNome.get(chave(r.empresa))
+                return (
+                  <tr key={r.id ?? i} className={r.empresa ? 'linha-clicavel' : ''} onClick={r.empresa ? () => setEmpresaAberta(r.empresa) : undefined} title={r.empresa ? 'Ver empresa' : undefined}>
+                    <td className="col-sel" onClick={(ev) => ev.stopPropagation()}><input type="checkbox" checked={selecionados.has(r.id)} onChange={() => alternar(r.id)} /></td>
+                    <td className="cel-nome">
+                      <div className="contato-nome">
+                        <strong className="cel-trunca" title={nomeProprio(r.nome)}>{nomeProprio(r.nome) || '—'}{r.eh_socio && <span className="tag-socio-mini">SÓCIO</span>}</strong>
+                        {r.cargo && <small className="contato-cargo cel-trunca" title={r.cargo}>{r.cargo}</small>}
+                      </div>
+                    </td>
+                    <td className="col-cen" title={nomeProprio(r.empresa)}>
+                      <CompanyLogo dominio={emp?.dominio || r.dominio} logo={emp?.logo} nome={r.empresa} size={28} />
+                    </td>
+                    <td className="cel-nowrap">{formatarCnpj(r.cnpj) || '—'}</td>
+                    <td className="cel-dominio"><span className="cel-trunca" title={r.dominio}>{r.dominio || '—'}</span></td>
+                    <td className="cel-email"><span className="cel-trunca" title={r.email}>{r.email || '—'}</span></td>
+                    <td className="cel-nowrap">
+                      {emp
+                        ? <span className="pill pill-ok" title={emp.enriquecido_em ? 'enriquecida em ' + emp.enriquecido_em : 'enriquecida'}>✓{emp.enriquecido_em ? ' ' + emp.enriquecido_em : ''}</span>
+                        : <span className="ajuda">não</span>}
+                    </td>
+                    <td className="col-sel" onClick={(ev) => ev.stopPropagation()}><button className="btn-mini" onClick={() => enriquecerEmpresasDe([r])}>enriquecer</button></td>
+                  </tr>
+                )
+              })}
+              {visiveis.length === 0 && <tr><td colSpan={8} className="empty">Nenhum contato.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {empresaAberta && (() => {

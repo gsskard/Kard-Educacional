@@ -805,3 +805,17 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .hist-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
 .hist-topo h3 { margin: 0; }
 .hist-tudo { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 12.5px; }
+
+/* Tabela de Contatos: sem estourar a página — a rolagem fica no contêiner
+   e as células longas truncam com reticências (tooltip mostra o valor inteiro) */
+.tabela-rolagem { overflow-x: auto; }
+.contatos-tabela { width: 100%; table-layout: fixed; }
+.contatos-tabela th, .contatos-tabela td { vertical-align: middle; }
+.contatos-tabela .col-sel { width: 44px; }
+.contatos-tabela .col-cen { width: 72px; text-align: center; }
+.contatos-tabela .cel-nome { width: 22%; }
+.contatos-tabela .cel-dominio { width: 15%; }
+.contatos-tabela .cel-email { width: 24%; }
+.contatos-tabela .cel-nowrap { white-space: nowrap; }
+.cel-trunca { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contatos-tabela .pill { padding: 3px 9px; font-size: 11.5px; white-space: nowrap; }
