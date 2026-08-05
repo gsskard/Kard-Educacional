@@ -11,9 +11,84 @@ export class EmpresasService {
   // GET /crm-cobranca/rh-empresas — empresas enriquecidas (agregado por CNPJ da
   // tabela rh_enriquecimento do módulo Snov). emails_rh traz só os já revelados.
   async listarEmpresas() {
-    const data = await this.api.get('/crm-cobranca/rh-empresas')
-    const lista = Array.isArray(data) ? data : (data?.data || [])
+    // Duas fontes: o RH antigo (rh_enriquecimento) e as validações novas por IA
+    // (tabela enriquecimento_dominio no Postgres, via CSV "tudo"). Mescla por CNPJ,
+    // com prioridade para o registro de RH (tem contatos/prospects).
+    const [rh, validadas] = await Promise.all([
+      this.api.get('/crm-cobranca/rh-empresas').catch(() => []),
+      this.listarValidadas().catch(() => []),
+    ])
+    const lista = Array.isArray(rh) ? rh : (rh?.data || [])
+    const cnpjs = new Set(lista.map((e) => String(e.cnpj || '').replace(/\D/g, '')))
+    for (const v of validadas) {
+      if (!cnpjs.has(v.cnpj)) { cnpjs.add(v.cnpj); lista.push(v) }
+    }
     return lista.map(Empresa.fromJson)
+  }
+
+  // Lê o CSV completo das validações por IA e converte para o formato da listagem.
+  // (Endpoint JSON dedicado fica para quando mexermos no n8n; o CSV já tem tudo.)
+  async listarValidadas() {
+    const resp = await fetch(this.api.base + '/lote-dominio-csv-tudo')
+    if (!resp.ok) return []
+    const texto = await resp.text()
+    const linhas = this.constructor.parseCsv(texto)
+    if (linhas.length < 2) return []
+    const cab = linhas[0]
+    const idx = (nome) => cab.indexOf(nome)
+    const col = (l, nome) => { const i = idx(nome); return i >= 0 ? (l[i] || '') : '' }
+    const contar = (v) => v ? v.split('|').join(',').split(',').map((x) => x.trim()).filter(Boolean).length : 0
+    const vistos = new Set()
+    const out = []
+    for (const l of linhas.slice(1)) {
+      const cnpj = String(col(l, 'cnpj')).replace(/\D/g, '')
+      if (!cnpj || vistos.has(cnpj)) continue // CSV vem do mais novo p/ o mais antigo
+      vistos.add(cnpj)
+      const cidade = col(l, 'cidade'), uf = col(l, 'uf')
+      const criado = col(l, 'criado_em')
+      const m = criado.match(/(\d{4})-(\d{2})-(\d{2})/)
+      out.push({
+        cnpj,
+        empresa: col(l, 'nome_fantasia') || col(l, 'razao_social_oficial') || col(l, 'razao_social'),
+        dominio: col(l, 'dominio') === '-' ? '' : col(l, 'dominio'),
+        site: col(l, 'dominio') && col(l, 'dominio') !== '-' ? 'https://' + col(l, 'dominio') : '',
+        localizacao: cidade ? `${cidade}${uf ? '/' + uf : ''}` : '',
+        categoria: col(l, 'descricao_cnae'),
+        porte: col(l, 'porte'),
+        capital_social: col(l, 'capital_social'),
+        total_prospects: contar(col(l, 'emails')) + contar(col(l, 'emails_snov')),
+        total_rh: contar(col(l, 'emails_snov')),
+        revelados: contar(col(l, 'emails_snov')),
+        dominio_score: Number(col(l, 'score')) || 0,
+        dominio_confere: col(l, 'caso') === 'A',
+        enriquecido_em: m ? `${m[3]}/${m[2]}/${m[1]}` : '',
+        fonte: 'validacao_ia',
+      })
+    }
+    return out
+  }
+
+  // Parser de CSV no formato que o próprio n8n gera: `;`, campos entre aspas com "" escapado.
+  static parseCsv(texto) {
+    const linhas = []
+    let linha = [], campo = '', dentro = false
+    const s = String(texto || '').replace(/^﻿/, '')
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i]
+      if (dentro) {
+        if (c === '"') { if (s[i + 1] === '"') { campo += '"'; i++ } else dentro = false }
+        else campo += c
+      } else if (c === '"') dentro = true
+      else if (c === ';') { linha.push(campo); campo = '' }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && s[i + 1] === '\n') i++
+        linha.push(campo); campo = ''
+        if (linha.some((x) => x !== '')) linhas.push(linha)
+        linha = []
+      } else campo += c
+    }
+    if (campo !== '' || linha.length) { linha.push(campo); if (linha.some((x) => x !== '')) linhas.push(linha) }
+    return linhas
   }
 
   // POST /crm-cobranca/rh-preview — GRÁTIS (0 créditos Snov). Descobre o domínio

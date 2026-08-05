@@ -3,7 +3,7 @@ import { listarEmpresas, enriquecerEmpresa, descobrirEmpresa, salvarEmpresa, ocu
 import CompanyLogo from '../componentes/CompanyLogo'
 import ValidacaoIALote from '../componentes/ValidacaoIALote'
 import PainelEmpresa from '../componentes/PainelEmpresa'
-import { nomeProprio, formatarCnpj, confiancaDominio, faltaLiberarRh } from '../lib/formato'
+import { nomeProprio, formatarCnpj, confiancaDominio } from '../lib/formato'
 
 // Cargos-alvo do filtro de RH: os mesmos termos que o back usa pra marcar `eh_rh`.
 // Mostramos como hashtags no card pra deixar claro que contatos buscamos.
@@ -165,10 +165,8 @@ export default function Empresas() {
   const [formEmp, setFormEmp] = useState(null)   // null | { modo:'novo'|'editar', cnpj, empresa, ... }
   const [salvandoEmp, setSalvandoEmp] = useState(false)
   const [desfazer, setDesfazer] = useState(null) // null | { cnpj, nome } — empresa recém-ocultada
-  const [autoLib, setAutoLib] = useState(false)  // rodando o auto-liberar 3 RH (≥60%)
 
   // teto de 3 RH por empresa, só ≥60% (helper compartilhado em lib/formato)
-  const faltaLiberar = faltaLiberarRh
 
   const chaveEmp = (e) => e.cnpj || e.empresa || ''
   const corEmp = (e) => confiancaDominio(e.dominio_score).cor  // 'verde' | 'ambar' | 'vermelho'
@@ -362,33 +360,6 @@ export default function Empresas() {
     }
   }
 
-  // PAGO: auto-libera até 3 RH por empresa nas que têm confiança de domínio ≥60%
-  // (pula vermelhos/divergentes) e ainda não chegaram a 3 revelados. Roda em pool
-  // paralelo (a rota de reveal não usa ReceitaWS, então dá pra concorrer).
-  async function autoLiberarRh() {
-    const alvos = rows.map((e) => ({ e, q: faltaLiberar(e) })).filter((x) => x.q > 0 && x.e.cnpj)
-    if (!alvos.length) { setMsg('Nada a liberar: nenhuma empresa ≥60% com RH pendente (teto de 3).'); return }
-    const credEst = alvos.reduce((s, x) => s + x.q, 0)
-    if (!window.confirm(`Auto-liberar RH em ${alvos.length} empresa(s) (domínio ≥60%), até 3 cada.\nAté ~${credEst} crédito(s) Snov (1 por e-mail encontrado). Continuar?`)) return
-    setAutoLib(true); setMsg('')
-    let feitas = 0, falhas = 0
-    const fila = alvos.slice()
-    const LIMITE = 4
-    async function worker() {
-      while (fila.length) {
-        const { e, q } = fila.shift()
-        setMsg(`Liberando RH ${++feitas}/${alvos.length}: ${e.empresa} (até ${q})…`)
-        try { await rhRevelar(e.cnpj, [], 'primeiros_n', q) } catch { falhas++ }
-      }
-    }
-    try {
-      await Promise.all(Array.from({ length: Math.min(LIMITE, fila.length) }, worker))
-      setMsg(`Auto-liberação concluída: ${alvos.length} empresa(s)` + (falhas ? `, ${falhas} com falha` : '') + '. Clique em Atualizar em instantes.')
-      carregar()
-    } finally {
-      setAutoLib(false)
-    }
-  }
 
   // reenriquecer força nova busca no Hunter (ignora o cache Redis)
   async function enriquecer(e) {
@@ -463,15 +434,6 @@ export default function Empresas() {
         <button className="btn-primario" disabled={emLote || rows.length === 0} onClick={enriquecerTudo}>
           {emLote ? 'Enriquecendo…' : 'Enriquecer tudo'}
         </button>
-        {(() => {
-          const nAuto = rows.reduce((s, e) => s + (e.cnpj ? Math.min(1, faltaLiberar(e)) : 0), 0)
-          return (
-            <button className="btn-primario btn-liberar-lote" disabled={autoLib || nAuto === 0} onClick={autoLiberarRh}
-              title="Libera até 3 e-mails de RH por empresa com confiança de domínio ≥60% (gasta crédito Snov)">
-              {autoLib ? 'Liberando…' : `🔓 Auto-liberar 3 RH${nAuto ? ` (${nAuto})` : ''}`}
-            </button>
-          )
-        })()}
         <button className="btn-refresh btn-excel" disabled={visiveis.length === 0} onClick={exportarExcel} title="Exportar Excel" aria-label="Exportar Excel">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z" fill="#fff" stroke="#1D6F42" strokeWidth="1.5" strokeLinejoin="round"/>
