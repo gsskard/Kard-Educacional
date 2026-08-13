@@ -5,6 +5,7 @@ import TelaEtapa from './telas/TelaEtapa'
 import Contatos from './telas/Contatos'
 import Empresas from './telas/Empresas'
 import Obitos from './telas/Obitos'
+import Inbox from './telas/inbox/Inbox'
 import Configuracoes from './telas/Configuracoes'
 import { ETAPAS } from './config/etapas'
 
@@ -19,6 +20,7 @@ export default function App() {
     if (rota === 'contatos') return <Contatos />
     if (rota === 'empresas') return <Empresas />
     if (rota === 'obitos') return <Obitos />
+    if (rota === 'inbox') return <Inbox />
     if (rota === 'configuracoes') return <Configuracoes />
     // rotas das 3 etapas → mesmo componente, config diferente
     if (ETAPAS[rota]) return <TelaEtapa etapa={ETAPAS[rota]} />
