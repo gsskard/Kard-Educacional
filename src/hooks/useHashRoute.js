@@ -6,9 +6,9 @@ import { useEffect, useState } from 'react'
 // e recarregar a página sem perder onde estava — sem instalar react-router.
 
 export function rotaAtual() {
-  // remove o "#/" do começo; se vier vazio, cai na 1ª tela do menu (Educacional)
+  // remove o "#/" do começo; se vier vazio, cai na 1ª tela do menu (Disparos)
   const h = window.location.hash.replace(/^#\/?/, '').trim()
-  return h || 'educacional'
+  return h || 'disparos'
 }
 
 export function irPara(rota) {
