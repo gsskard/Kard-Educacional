@@ -7,8 +7,7 @@ import { saldosPlataformas, snovSaldo } from '../api/n8n'
 // A sidebar recolhe/expande (☰) pra dar mais espaço às tabelas largas.
 
 const MENU = [
-  { rota: 'educacional', label: 'Educacional' },
-  { rota: 'cobranca', label: 'Cobrança' },
+  { rota: 'disparos', label: 'Disparos' },
   { rota: 'contatos', label: 'Contatos' },
   { rota: 'empresas', label: 'Empresas' },
   { rota: 'obitos', label: 'Óbitos' },

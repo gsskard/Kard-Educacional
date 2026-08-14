@@ -1,7 +1,7 @@
 import { useHashRoute } from './hooks/useHashRoute'
 import Layout from './componentes/Layout'
 import Dashboard from './telas/Dashboard'
-import TelaEtapa from './telas/TelaEtapa'
+import Disparos from './telas/Disparos'
 import Contatos from './telas/Contatos'
 import Empresas from './telas/Empresas'
 import Obitos from './telas/Obitos'
@@ -10,7 +10,7 @@ import Configuracoes from './telas/Configuracoes'
 import { ETAPAS } from './config/etapas'
 
 // Roteamento simples por hash (#/rota). Cada rota renderiza uma tela.
-// As 3 telas de etapa reusam o MESMO componente TelaEtapa (telas "espelho").
+// Educacional e Cobrança foram unificadas na tela "Disparos" (abas internas).
 
 export default function App() {
   const rota = useHashRoute()
@@ -22,8 +22,8 @@ export default function App() {
     if (rota === 'obitos') return <Obitos />
     if (rota === 'inbox') return <Inbox />
     if (rota === 'configuracoes') return <Configuracoes />
-    // rotas das 3 etapas → mesmo componente, config diferente
-    if (ETAPAS[rota]) return <TelaEtapa etapa={ETAPAS[rota]} />
+    // Disparos (inclui compat com os hashes antigos #/educacional e #/cobranca)
+    if (rota === 'disparos' || ETAPAS[rota]) return <Disparos />
     // rota desconhecida
     return <Dashboard />
   }
