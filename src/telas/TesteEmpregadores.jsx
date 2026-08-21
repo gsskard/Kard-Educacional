@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { enviarEmailEmpregadorTeste } from '../api/n8n'
 
-// Painel de teste dos 2 modelos de e-mail para EMPREGADORES (educativo),
-// disparados via CyberTalk (workflow "[TESTE CYBERTALK] E-mail Empregadores").
+// Painel de teste dos 2 modelos de e-mail para EMPREGADORES (educativo).
+// Dá pra escolher o CANAL de envio:
+//   • Outlook (Microsoft Graph) — entrega direto na caixa (recomendado p/ teste).
+//   • CyberTalk — passa pelo assistente; útil pra eventos/tracking, mas pode "conter".
 // Renderiza dentro de .disparos, então reaproveita os estilos escopados.
 
 const MODELOS_EMP = [
@@ -10,17 +12,22 @@ const MODELOS_EMP = [
   { id: 'escrituracao', nome: 'Prazo de escrituração', assunto: 'O prazo para a escrituração está quase vencendo' },
 ]
 
+const CANAIS = [
+  { id: 'outlook', nome: 'Outlook', dica: 'Microsoft Graph — entrega direto na caixa' },
+  { id: 'cybertalk', nome: 'CyberTalk', dica: 'Passa pelo assistente (eventos/tracking)' },
+]
+
 const EMAIL_PADRAO = 'gabriella.silva@kard.com.br'
 
-// Exemplos prontos pra clicar e disparar rápido.
 const EXEMPLOS = [
-  { modelo: 'repasse', nome: 'Padaria Pão Quente LTDA', destino: EMAIL_PADRAO },
-  { modelo: 'escrituracao', nome: 'Metalúrgica Silva ME', destino: EMAIL_PADRAO },
+  { canal: 'outlook', modelo: 'repasse', nome: 'Padaria Pão Quente LTDA', destino: EMAIL_PADRAO },
+  { canal: 'outlook', modelo: 'escrituracao', nome: 'Metalúrgica Silva ME', destino: EMAIL_PADRAO },
 ]
 
 const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(e)
 
 export default function TesteEmpregadores() {
+  const [canal, setCanal] = useState('outlook')
   const [modelo, setModelo] = useState('escrituracao')
   const [destino, setDestino] = useState(EMAIL_PADRAO)
   const [nome, setNome] = useState('Kard Teste LTDA')
@@ -30,8 +37,10 @@ export default function TesteEmpregadores() {
   const [erro, setErro] = useState('')
 
   const modeloAtual = MODELOS_EMP.find((m) => m.id === modelo) || MODELOS_EMP[0]
+  const canalAtual = CANAIS.find((c) => c.id === canal) || CANAIS[0]
 
   function aplicarExemplo(ex) {
+    setCanal(ex.canal)
     setModelo(ex.modelo)
     setNome(ex.nome)
     setDestino(ex.destino)
@@ -42,12 +51,13 @@ export default function TesteEmpregadores() {
 
   async function enviar() {
     if (!emailValido(destino) || !nome.trim()) return
-    if (!window.confirm(`Enviar o modelo "${modeloAtual.nome}" para ${destino}?\n\nIsso dispara um e-mail de verdade pela CyberTalk.`)) return
+    if (!window.confirm(`Enviar o modelo "${modeloAtual.nome}" via ${canalAtual.nome} para ${destino}?\n\nIsso dispara um e-mail de verdade.`)) return
     setEnviando(true)
     setResultado(null)
     setErro('')
     try {
       const r = await enviarEmailEmpregadorTeste({
+        canal,
         modelo,
         destino: destino.trim(),
         nome: nome.trim(),
@@ -61,14 +71,30 @@ export default function TesteEmpregadores() {
     }
   }
 
-  const ok = resultado && resultado.status === 'aceito_pela_api'
+  // Sucesso: Outlook responde status 'enviado'; CyberTalk responde 'aceito_pela_api'.
+  const ok = resultado && (resultado.status === 'enviado' || resultado.status === 'aceito_pela_api')
+  const viaOutlook = resultado ? resultado.canal === 'outlook' || resultado.status === 'enviado' : canal === 'outlook'
 
   return (
     <div className="bloco">
-      <h2>Teste — E-mail Empregadores <small>(2 modelos · CyberTalk)</small></h2>
+      <h2>Teste — E-mail Empregadores <small>(2 modelos)</small></h2>
       <p className="explica">
         Dispara um dos <b>2 modelos educativos</b> para empregadores e faz o merge do nome no HTML.
         <b> Envia um e-mail de verdade</b> para o destino informado — use um e-mail seu para testar.
+      </p>
+
+      <label className="campo"><span>Canal de envio</span></label>
+      <div className="abas" style={{ marginBottom: 18 }}>
+        {CANAIS.map((c) => (
+          <button key={c.id} data-etapa={c.id === 'outlook' ? 'educacional' : 'cobranca'}
+            aria-pressed={canal === c.id} onClick={() => { setCanal(c.id); setResultado(null) }}>
+            {c.nome}
+          </button>
+        ))}
+      </div>
+      <p className="ajuda" style={{ marginTop: -8 }}>
+        {canalAtual.dica}
+        {canal === 'cybertalk' && ' — obs.: pode voltar “aceito” sem entregar (contenção do assistente).'}
       </p>
 
       <label className="campo"><span>Modelo</span>
@@ -89,12 +115,12 @@ export default function TesteEmpregadores() {
       </label>
 
       <div className="acoes" style={{ marginBottom: 8 }}>
-        <button className="bt" disabled={enviando || !emailValido(destino) || !nome.trim()} onClick={enviar}>
-          {enviando ? 'Enviando…' : 'Enviar teste'}
+        <button className={'bt' + (canal === 'cybertalk' ? ' amb' : '')} disabled={enviando || !emailValido(destino) || !nome.trim()} onClick={enviar}>
+          {enviando ? 'Enviando…' : `Enviar teste via ${canalAtual.nome}`}
         </button>
       </div>
 
-      <p className="ajuda" style={{ margin: '6px 0 8px' }}>Exemplos rápidos:</p>
+      <p className="ajuda" style={{ margin: '6px 0 8px' }}>Exemplos rápidos (via Outlook):</p>
       <div className="acoes">
         {EXEMPLOS.map((ex, i) => (
           <button key={i} className="bt claro mini" onClick={() => aplicarExemplo(ex)}>
@@ -108,16 +134,19 @@ export default function TesteEmpregadores() {
       {resultado && (
         <div className="banner" style={{ marginTop: 14 }}>
           <div style={{ marginBottom: 6 }}>
-            <span className={'st ' + (ok ? 'ok' : 'err')}>{ok ? 'aceito pela CyberTalk' : 'falha'}</span>
+            <span className={'st ' + (ok ? 'ok' : 'err')}>
+              {ok ? (viaOutlook ? 'enviado (Outlook)' : 'aceito (CyberTalk)') : 'falha'}
+            </span>
             <span style={{ marginLeft: 10, color: 'var(--fraco)' }}>HTTP {resultado.http_status ?? '—'}</span>
           </div>
+          <div className="g-linha" style={{ padding: '6px 0' }}><span className="rot">Canal</span><span className="val">{resultado.canal || (viaOutlook ? 'outlook' : 'cybertalk')}</span></div>
           <div className="g-linha" style={{ padding: '6px 0' }}><span className="rot">Modelo</span><span className="val">{resultado.modelo}</span></div>
           <div className="g-linha" style={{ padding: '6px 0' }}><span className="rot">Destino</span><span className="val">{resultado.destino}</span></div>
           <div className="g-linha" style={{ padding: '6px 0' }}><span className="rot">Nome aplicado</span><span className="val">{resultado.nome_aplicado}</span></div>
           {resultado.communication_id && (
             <div className="g-linha" style={{ padding: '6px 0' }}><span className="rot">ID do envio</span><span className="val mono">{resultado.communication_id}</span></div>
           )}
-          {ok && <p className="ajuda" style={{ margin: '8px 0 0' }}>{resultado.aviso || 'aceito ≠ entregue — a entrega aparece nos eventos da CyberTalk.'}</p>}
+          {ok && <p className="ajuda" style={{ margin: '8px 0 0' }}>{resultado.aviso || 'Confira a caixa (e o spam).'}</p>}
           {!ok && resultado.resposta && <p className="mono" style={{ margin: '8px 0 0', color: 'var(--fraco)', wordBreak: 'break-all' }}>{resultado.resposta}</p>}
         </div>
       )}
