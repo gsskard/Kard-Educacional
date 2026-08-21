@@ -11,6 +11,7 @@ import { listasService } from '../services/ListasService'
 import { empresasService } from '../services/EmpresasService'
 import { rhService } from '../services/RhService'
 import { obitosService } from '../services/ObitosService'
+import { empregadoresService } from '../services/EmpregadoresService'
 
 // --- Cobrança / contatos ---
 export const listarContatos = () => cobrancaService.listarContatos()
@@ -63,3 +64,6 @@ export const API = api.base
 
 // --- Óbitos / consulta cadastral por CPF (Nova Vida NVCheck) ---
 export const nvCheckCpf = (cpf) => obitosService.consultarCpf(cpf)
+
+// --- Teste de e-mail Empregadores (educativo) via CyberTalk ---
+export const enviarEmailEmpregadorTeste = (dados) => empregadoresService.enviarTeste(dados)

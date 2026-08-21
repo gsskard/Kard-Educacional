@@ -3,6 +3,7 @@ import {
   criarLista, listarListas, dispararLista, importarForaDaBase, lerEnviosListas,
 } from '../api/n8n'
 import { ETAPAS, ETAPAS_ORDEM } from '../config/etapas'
+import TesteEmpregadores from './TesteEmpregadores'
 import './Disparos.css'
 
 // Tela "Disparos" (substitui as antigas telas espelho Educacional/Cobrança).
@@ -251,6 +252,8 @@ function DispararView() {
       )}
 
       <DisparoPorLista etapa={etapa} edu={edu} versaoListas={versaoListas} />
+
+      {edu && <TesteEmpregadores />}
     </>
   )
 }
