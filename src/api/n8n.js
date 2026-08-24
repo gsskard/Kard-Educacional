@@ -67,3 +67,4 @@ export const nvCheckCpf = (cpf) => obitosService.consultarCpf(cpf)
 
 // --- Teste de e-mail Empregadores (educativo) via CyberTalk ---
 export const enviarEmailEmpregadorTeste = (dados) => empregadoresService.enviarTeste(dados)
+export const lerEnviosEmpregador = () => empregadoresService.lerEnvios()
