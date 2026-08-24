@@ -5,6 +5,7 @@ import Disparos from './telas/Disparos'
 import Contatos from './telas/Contatos'
 import Empresas from './telas/Empresas'
 import Obitos from './telas/Obitos'
+import ETL from './telas/ETL'
 import Configuracoes from './telas/Configuracoes'
 import { ETAPAS } from './config/etapas'
 
@@ -19,6 +20,7 @@ export default function App() {
     if (rota === 'contatos') return <Contatos />
     if (rota === 'empresas') return <Empresas />
     if (rota === 'obitos') return <Obitos />
+    if (rota === 'etl') return <ETL />
     if (rota === 'configuracoes') return <Configuracoes />
     // Disparos (inclui compat com os hashes antigos #/educacional e #/cobranca)
     if (rota === 'disparos' || ETAPAS[rota]) return <Disparos />
