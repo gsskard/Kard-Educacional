@@ -819,3 +819,22 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .contatos-tabela .cel-nowrap { white-space: nowrap; }
 .cel-trunca { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .contatos-tabela .pill { padding: 3px 9px; font-size: 11.5px; white-space: nowrap; }
+
+/* ETL — passo a passo guiado (stepper) */
+.etl-steps { list-style: none; display: flex; gap: 12px; padding: 0; margin: 0 0 22px; flex-wrap: wrap; }
+.etl-step { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--borda);
+  cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.etl-step:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30,43,77,.08); }
+.etl-step-num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; font-size: 14px; background: #eef1f8; color: var(--muted); border: 1px solid var(--borda);
+  transition: background .18s ease, color .18s ease, border-color .18s ease; }
+.etl-step-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.etl-step-txt b { font-size: 14px; color: var(--navy-800); }
+.etl-step-txt small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.etl-step.etl-atual { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(34,197,94,.14); }
+.etl-step.etl-atual .etl-step-num { background: var(--verde); color: #fff; border-color: var(--verde); }
+.etl-step.etl-feito .etl-step-num { background: var(--verde-600); color: #fff; border-color: var(--verde-600); }
+.etl-step.etl-pendente { opacity: .65; }
+.secao.secao-ativa { border-color: var(--verde); box-shadow: 0 0 0 2px rgba(34,197,94,.16); }
+@media (max-width: 700px) { .etl-step { flex: 1 1 100%; } }

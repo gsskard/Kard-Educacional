@@ -67,6 +67,18 @@ const fmtTamanho = (n) => {
 const fmtData = (ms) => (ms ? new Date(ms).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—')
 const fmtNum = (n) => Number(n || 0).toLocaleString('pt-BR')
 
+// Um passo do "stepper" guiado. Clicar rola até a seção correspondente.
+function Passo({ n, titulo, sub, feito, atual, alvo }) {
+  const cls = 'etl-step ' + (feito ? 'etl-feito' : atual ? 'etl-atual' : 'etl-pendente')
+  const ir = () => document.getElementById(alvo)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  return (
+    <li className={cls} onClick={ir}>
+      <span className="etl-step-num">{feito ? '✓' : n}</span>
+      <span className="etl-step-txt"><b>{titulo}</b><small>{sub}</small></span>
+    </li>
+  )
+}
+
 export default function ETL() {
   const [handle, setHandle] = useState(null)
   const [precisaReconectar, setPrecisaReconectar] = useState(false)
@@ -275,6 +287,12 @@ export default function ETL() {
   const nomePasta = handle?.name || 'pasta'
   const rodando = !!proc
 
+  // estados do passo a passo guiado
+  const passoConectado = !!handle && !precisaReconectar
+  const passoArquivo = passoConectado && !!sel
+  const passoTratado = passoArquivo && !!(duckRes || resultado || duckExportado)
+  const passoAtual = !passoConectado ? 1 : !passoArquivo ? 2 : 3
+
   return (
     <div>
       <header className="pagina-head"><h1>ETL</h1></header>
@@ -288,7 +306,13 @@ export default function ETL() {
         </section>
       ) : (
         <>
-          <section className="secao">
+          <ol className="etl-steps">
+            <Passo n={1} titulo="Conectar pasta" sub={passoConectado ? nomePasta : 'pasta local / de rede'} feito={passoConectado} atual={passoAtual === 1} alvo="etl-conectar" />
+            <Passo n={2} titulo="Escolher arquivo" sub={sel ? sel.nome : 'CSV da pasta'} feito={passoArquivo} atual={passoAtual === 2} alvo="etl-arquivos" />
+            <Passo n={3} titulo="Tratar" sub={passoTratado ? 'concluído' : 'filtrar ou consultar (SQL)'} feito={passoTratado} atual={passoAtual === 3} alvo="etl-tratar" />
+          </ol>
+
+          <section className={'secao' + (passoAtual === 1 ? ' secao-ativa' : '')} id="etl-conectar">
             <h2>1. Conectar pasta</h2>
             <p className="ajuda">
               Conecte a pasta onde as rotinas geram os arquivos (ex.: <span className="mono">Z:\ SICRepositorio</span> —
@@ -304,8 +328,9 @@ export default function ETL() {
           </section>
 
           {arquivos !== null && !precisaReconectar && (
-            <section className="secao">
+            <section className={'secao' + (passoAtual === 2 ? ' secao-ativa' : '')} id="etl-arquivos">
               <h2>2. Arquivos na pasta <small>({visiveis.length})</small></h2>
+              {!sel && visiveis.length > 0 && <p className="ajuda" style={{ marginTop: -6, marginBottom: 12 }}>👉 Clique num arquivo para tratar.</p>}
               <div className="campo-modelo">
                 <label>Buscar arquivo</label>
                 <input type="text" value={busca} placeholder="ex.: 2026-08 ou .csv" onChange={(e) => setBusca(e.target.value)} />
@@ -331,7 +356,7 @@ export default function ETL() {
           )}
 
           {sel && (
-            <section className="secao">
+            <section className={'secao' + (passoAtual === 3 ? ' secao-ativa' : '')} id="etl-tratar">
               <h2>3. Tratar — {sel.nome}</h2>
               <p className="ajuda">
                 {fmtTamanho(sel.tamanho)} · modificado {fmtData(sel.modificado)}. Tudo roda no seu navegador (streaming / DuckDB):
