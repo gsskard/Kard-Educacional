@@ -57,6 +57,16 @@ const salvarReceita = (nome, receita) => {
   try { localStorage.setItem('kard_etl_receita_' + chaveModelo(nome), JSON.stringify(receita)) } catch { /* ignora */ }
 }
 
+/* ---- queries salvas + regras de agendamento (localStorage) ---- */
+// Cada query: { id, nome, sql, prefixo, auto, intervaloMin, lastRun:{quando,arquivo,total,erro} }
+const carregarQueries = () => { try { return JSON.parse(localStorage.getItem('kard_etl_queries') || '[]') } catch { return [] } }
+const persistQueries = (qs) => { try { localStorage.setItem('kard_etl_queries', JSON.stringify(qs)) } catch { /* ignora */ } }
+// Arquivo mais recente cujo nome começa com o prefixo (lista já vem ordenada desc por data).
+const maisRecente = (lista, prefixo) => {
+  const p = (prefixo || '').toLowerCase().trim()
+  return (lista || []).find((a) => !p || a.nome.toLowerCase().startsWith(p)) || null
+}
+
 const fmtTamanho = (n) => {
   if (n == null) return '—'
   if (n < 1024) return n + ' B'
@@ -115,6 +125,10 @@ export default function ETL() {
   const [duckDelim, setDuckDelim] = useState('') // '' = auto, ';', ',', '\\t'
   const [duckMeta, setDuckMeta] = useState(null) // { encoding, delim } efetivos
 
+  // queries salvas + regras/agendamento
+  const [queries, setQueries] = useState(() => carregarQueries())
+  const [formSalvar, setFormSalvar] = useState(null) // { nome, prefixo, auto, intervalo } | null
+
   // ao abrir, tenta recuperar a pasta já autorizada
   useEffect(() => {
     if (!SUPORTA) return
@@ -150,19 +164,24 @@ export default function ETL() {
     else setErro('Permissão negada. Clique em "Conectar pasta" e autorize.')
   }
 
+  // lê os arquivos da pasta e devolve a lista ordenada (desc por data) — sem mexer no estado
+  async function escanear(dir) {
+    const arqs = []
+    for await (const entry of dir.values()) {
+      if (entry.kind !== 'file') continue
+      try {
+        const f = await entry.getFile()
+        arqs.push({ nome: entry.name, tamanho: f.size, modificado: f.lastModified, handle: entry })
+      } catch { /* arquivo bloqueado/em uso — ignora */ }
+    }
+    arqs.sort((a, b) => b.modificado - a.modificado)
+    return arqs
+  }
+
   async function listar(dir) {
     setCarregando(true); setErro(''); fecharSel()
     try {
-      const arqs = []
-      for await (const entry of dir.values()) {
-        if (entry.kind !== 'file') continue
-        try {
-          const f = await entry.getFile()
-          arqs.push({ nome: entry.name, tamanho: f.size, modificado: f.lastModified, handle: entry })
-        } catch { /* arquivo bloqueado/em uso — ignora */ }
-      }
-      arqs.sort((a, b) => b.modificado - a.modificado)
-      setArquivos(arqs)
+      setArquivos(await escanear(dir))
     } catch (e) {
       setErro('Erro ao ler a pasta: ' + (e?.message || e))
       setArquivos([])
@@ -220,6 +239,87 @@ export default function ETL() {
       if (e?.name !== 'AbortError') setDuckErro('Erro ao exportar: ' + (e?.message || e))
     }
   }
+
+  /* ---- queries salvas ---- */
+  function marcarStatus(id, info) {
+    setQueries((prev) => {
+      const next = prev.map((q) => (q.id === id ? { ...q, lastRun: { ...(q.lastRun || {}), ...info } } : q))
+      persistQueries(next); return next
+    })
+  }
+  function abrirFormSalvar() {
+    setFormSalvar({ nome: '', prefixo: sel ? chaveModelo(sel.nome) : '', auto: false, intervalo: 0 })
+  }
+  function salvarQueryAtual() {
+    const nome = (formSalvar.nome || '').trim()
+    if (!nome) return
+    const q = {
+      id: 'q_' + Date.now().toString(36), nome, sql,
+      prefixo: (formSalvar.prefixo || '').trim(),
+      auto: !!formSalvar.auto,
+      intervaloMin: Math.max(0, Number(formSalvar.intervalo) || 0),
+    }
+    setQueries((prev) => { const next = [...prev, q]; persistQueries(next); return next })
+    setFormSalvar(null)
+  }
+  function toggleAuto(id) {
+    setQueries((prev) => { const next = prev.map((q) => (q.id === id ? { ...q, auto: !q.auto } : q)); persistQueries(next); return next })
+  }
+  function excluirQuery(id) {
+    setQueries((prev) => { const next = prev.filter((q) => q.id !== id); persistQueries(next); return next })
+  }
+
+  // roda uma query salva: acha o arquivo mais recente da regra, abre no DuckDB e executa
+  async function rodarQuery(q, listaBase) {
+    const lista = listaBase || arquivos || []
+    const arq = maisRecente(lista, q.prefixo)
+    if (!arq) { marcarStatus(q.id, { erro: `Nenhum arquivo começando com "${q.prefixo}"`, quando: Date.now() }); return }
+    setModo('sql'); setSel(arq); resetDuck(); setSql(q.sql)
+    setDuckRodando(true); setDuckErro('')
+    try {
+      const meta = await abrirBase(arq.handle, { encoding: duckEnc || undefined, delim: duckDelim || undefined })
+      setDuckColunas(meta.colunas); setDuckMeta({ encoding: meta.encoding, delim: meta.delim }); setDuckBaseDe(arq.nome)
+      const r = await rodarSql(q.sql)
+      setDuckRes(r)
+      marcarStatus(q.id, { quando: Date.now(), arquivo: arq.nome, total: r.total, erro: null })
+    } catch (e) {
+      setDuckErro(`Erro na query "${q.nome}": ` + (e?.message || e))
+      marcarStatus(q.id, { quando: Date.now(), arquivo: arq.nome, erro: String(e?.message || e) })
+    } finally {
+      setDuckRodando(false)
+    }
+  }
+
+  // auto-run ao (re)listar a pasta: roda as queries marcadas como "auto"
+  useEffect(() => {
+    if (arquivos === null || precisaReconectar) return
+    const autos = queries.filter((q) => q.auto)
+    if (!autos.length) return
+    let vivo = true
+    ;(async () => { for (const q of autos) { if (!vivo) break; await rodarQuery(q, arquivos) } })()
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arquivos])
+
+  // agendamento enquanto a aba está aberta: re-escaneia a pasta e roda as queries vencidas
+  useEffect(() => {
+    if (!handle || precisaReconectar) return
+    if (!queries.some((q) => q.auto && q.intervaloMin > 0)) return
+    const id = setInterval(async () => {
+      const perm = await handle.queryPermission({ mode: 'read' }).catch(() => 'denied')
+      if (perm !== 'granted') return
+      const lista = await escanear(handle).catch(() => null)
+      if (!lista) return
+      setArquivos(lista)
+      const agora = Date.now()
+      for (const q of queries) {
+        if (!q.auto || !q.intervaloMin) continue
+        if (agora - (q.lastRun?.quando || 0) >= q.intervaloMin * 60000) await rodarQuery(q, lista)
+      }
+    }, 60000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handle, precisaReconectar, queries])
 
   // selecionar arquivo: lê o cabeçalho e aplica a receita lembrada (se houver)
   async function selecionar(item, enc = encoding) {
@@ -352,6 +452,43 @@ export default function ETL() {
                   </table>
                 </div>
               )}
+            </section>
+          )}
+
+          {arquivos !== null && !precisaReconectar && queries.length > 0 && (
+            <section className="secao" id="etl-queries">
+              <h2>Queries salvas <small>({queries.length})</small></h2>
+              <p className="ajuda" style={{ marginTop: -6, marginBottom: 12 }}>
+                Cada query roda no arquivo mais recente que começa com o nome da regra. As marcadas como <b>auto</b> rodam ao abrir a tela e re-checam sozinhas enquanto a aba fica aberta.
+              </p>
+              <div className="etl-qlist">
+                {queries.map((q) => (
+                  <div className="etl-qcard" key={q.id}>
+                    <div className="etl-qcard-topo">
+                      <b>{q.nome}</b>
+                      <label className="etl-auto" title="Rodar automaticamente ao abrir / a cada intervalo">
+                        <input type="checkbox" checked={q.auto} onChange={() => toggleAuto(q.id)} /> auto
+                      </label>
+                    </div>
+                    <div className="ajuda" style={{ margin: '4px 0' }}>
+                      Arquivo começa com <span className="mono">{q.prefixo || '(qualquer)'}</span>
+                      {q.auto && q.intervaloMin ? ` · re-checa a cada ${q.intervaloMin} min` : ''}
+                    </div>
+                    {q.lastRun && (q.lastRun.quando || q.lastRun.erro) && (
+                      <div className="ajuda" style={{ margin: '4px 0', color: q.lastRun.erro ? '#b4232a' : 'var(--verde-600)' }}>
+                        {q.lastRun.erro
+                          ? `⚠ ${q.lastRun.erro}`
+                          : `✔ ${fmtNum(q.lastRun.total)} linhas · ${q.lastRun.arquivo} · ${fmtData(q.lastRun.quando)}`}
+                      </div>
+                    )}
+                    <div className="acoes" style={{ marginTop: 8, gap: 8 }}>
+                      <button className="btn-primario" onClick={() => rodarQuery(q)} disabled={duckRodando || duckCarregando}>Atualizar agora</button>
+                      <button className="btn-refresh" onClick={() => { setModo('sql'); setSql(q.sql); document.getElementById('etl-tratar')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>Abrir no editor</button>
+                      <button className="btn-refresh" onClick={() => excluirQuery(q.id)}>Excluir</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
@@ -510,7 +647,35 @@ export default function ETL() {
                         {duckCarregando ? 'Abrindo no DuckDB…' : duckRodando ? 'Rodando…' : '▶ Rodar'}
                       </button>
                       <button className="btn-secundario" onClick={exportar} disabled={duckRodando || duckCarregando}>Exportar CSV</button>
+                      <button className="btn-refresh" onClick={abrirFormSalvar}>💾 Salvar query</button>
                     </div>
+
+                    {formSalvar && (
+                      <div className="etl-panel" style={{ marginTop: 12, background: '#fff' }}>
+                        <span className="etl-rotulo">Salvar esta query</span>
+                        <div className="acoes" style={{ gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 0 }}>
+                          <div className="campo-modelo" style={{ margin: 0 }}>
+                            <label>Nome</label>
+                            <input type="text" value={formSalvar.nome} placeholder="Ex.: Recorte CLT do mês" onChange={(e) => setFormSalvar({ ...formSalvar, nome: e.target.value })} />
+                          </div>
+                          <div className="campo-modelo" style={{ margin: 0 }}>
+                            <label>Arquivo começa com</label>
+                            <input type="text" value={formSalvar.prefixo} placeholder="Ex.: RemessaParcelas" onChange={(e) => setFormSalvar({ ...formSalvar, prefixo: e.target.value })} />
+                          </div>
+                          <label className="etl-auto"><input type="checkbox" checked={formSalvar.auto} onChange={(e) => setFormSalvar({ ...formSalvar, auto: e.target.checked })} /> rodar ao abrir</label>
+                          {formSalvar.auto && (
+                            <div className="campo-modelo" style={{ margin: 0 }}>
+                              <label>Re-checar a cada (min)</label>
+                              <input type="number" min="0" value={formSalvar.intervalo} onChange={(e) => setFormSalvar({ ...formSalvar, intervalo: e.target.value })} style={{ width: 130 }} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="acoes" style={{ marginTop: 10 }}>
+                          <button className="btn-primario" onClick={salvarQueryAtual} disabled={!formSalvar.nome.trim()}>Salvar</button>
+                          <button className="btn-refresh" onClick={() => setFormSalvar(null)}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {duckErro && <div className="banner" style={{ marginTop: 14 }}>{duckErro}</div>}

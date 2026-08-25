@@ -862,3 +862,11 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .etl-cols { display: flex; flex-wrap: wrap; gap: 6px; }
 .etl-col-chip { display: inline-flex; align-items: baseline; gap: 5px; background: #fff; border: 1px solid var(--borda); border-radius: 8px; padding: 3px 9px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--navy-800); }
 .etl-col-chip small { color: var(--muted); font-size: 11px; }
+
+/* ETL — queries salvas */
+.etl-qlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.etl-qcard { background: #f8fafc; border: 1px solid var(--borda); border-radius: 14px; padding: 14px 16px; }
+.etl-qcard-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.etl-qcard-topo b { font-size: 14.5px; color: var(--navy-800); }
+.etl-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--navy-600); cursor: pointer; white-space: nowrap; }
+.etl-qcard .acoes .btn-primario, .etl-qcard .acoes .btn-refresh { padding: 7px 12px; font-size: 13px; }
