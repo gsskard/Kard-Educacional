@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { lerCabecalho, processarArquivo } from './etlStreaming'
+import { abrirBase, rodarSql, exportarSql, SQL_RECORTE_CLT } from './etlDuck'
 
 // Tela ETL — conecta uma PASTA LOCAL/DE REDE via File System Access API
 // (ex.: Z: \\192.168.137.5\FIFileSync\Producao) e lista os arquivos que as
@@ -87,6 +88,18 @@ export default function ETL() {
   const [resultado, setResultado] = useState(null)
   const [sinal, setSinal] = useState(null)
 
+  // modo do painel do arquivo: 'sql' (DuckDB) ou 'simples' (streaming)
+  const [modo, setModo] = useState('sql')
+  // SQL / DuckDB
+  const [sql, setSql] = useState('SELECT * FROM base LIMIT 100')
+  const [duckBaseDe, setDuckBaseDe] = useState(null) // nome do arquivo já registrado no DuckDB
+  const [duckColunas, setDuckColunas] = useState(null)
+  const [duckCarregando, setDuckCarregando] = useState(false)
+  const [duckRodando, setDuckRodando] = useState(false)
+  const [duckErro, setDuckErro] = useState('')
+  const [duckRes, setDuckRes] = useState(null) // { colunas, linhas, total, ms }
+  const [duckExportado, setDuckExportado] = useState('')
+
   // ao abrir, tenta recuperar a pasta já autorizada
   useEffect(() => {
     if (!SUPORTA) return
@@ -146,11 +159,51 @@ export default function ETL() {
   function fecharSel() {
     setSel(null); setCab(null); setManter([]); setRemoverVazias([]); setDedupIdx('')
     setProc(null); setResultado(null)
+    resetDuck()
+  }
+
+  function resetDuck() {
+    setDuckBaseDe(null); setDuckColunas(null); setDuckRes(null); setDuckErro(''); setDuckExportado('')
+  }
+
+  // garante que o arquivo selecionado está registrado no DuckDB (view "base")
+  async function garantirBase() {
+    if (duckBaseDe === sel.nome && duckColunas) return
+    setDuckCarregando(true); setDuckErro('')
+    try {
+      const { colunas } = await abrirBase(sel.handle)
+      setDuckColunas(colunas); setDuckBaseDe(sel.nome)
+    } finally {
+      setDuckCarregando(false)
+    }
+  }
+
+  async function rodar() {
+    setDuckErro(''); setDuckRes(null); setDuckExportado(''); setDuckRodando(true)
+    try {
+      await garantirBase()
+      setDuckRes(await rodarSql(sql))
+    } catch (e) {
+      setDuckErro('Erro no SQL: ' + (e?.message || e))
+    } finally {
+      setDuckRodando(false)
+    }
+  }
+
+  async function exportar() {
+    setDuckErro(''); setDuckExportado('')
+    try {
+      await garantirBase()
+      const nome = await exportarSql(sql, 'recorte_' + (sel?.nome || 'base.csv'))
+      setDuckExportado(nome)
+    } catch (e) {
+      if (e?.name !== 'AbortError') setDuckErro('Erro ao exportar: ' + (e?.message || e))
+    }
   }
 
   // selecionar arquivo: lê o cabeçalho e aplica a receita lembrada (se houver)
   async function selecionar(item, enc = encoding) {
-    setSel(item); setProc(null); setResultado(null); setErro('')
+    setSel(item); setProc(null); setResultado(null); setErro(''); resetDuck()
     setCab({ colunas: null, sep: null }) // "carregando cabeçalho"
     try {
       const f = await item.handle.getFile()
@@ -271,13 +324,18 @@ export default function ETL() {
 
           {sel && (
             <section className="secao">
-              <h2>3. Filtrar / limpar — {sel.nome}</h2>
+              <h2>3. Tratar — {sel.nome}</h2>
               <p className="ajuda">
-                {fmtTamanho(sel.tamanho)} · modificado {fmtData(sel.modificado)}. O arquivo é lido em blocos (streaming) e um
-                CSV tratado novo é gravado — nada é carregado inteiro na memória, então tamanho não é problema.
+                {fmtTamanho(sel.tamanho)} · modificado {fmtData(sel.modificado)}. Tudo roda no seu navegador (streaming / DuckDB):
+                o arquivo é lido em blocos, nada sobe pra nuvem — então tamanho e privacidade (CPF) não são problema.
               </p>
 
-              {!cab ? null : cab.colunas === null ? (
+              <div className="acoes" style={{ gap: 8, marginBottom: 12 }}>
+                <button className={'btn-refresh' + (modo === 'sql' ? ' ativo' : '')} onClick={() => setModo('sql')}>SQL (DuckDB)</button>
+                <button className={'btn-refresh' + (modo === 'simples' ? ' ativo' : '')} onClick={() => setModo('simples')}>Filtrar (simples)</button>
+              </div>
+
+              {modo === 'simples' && (!cab ? null : cab.colunas === null ? (
                 <div className="loading">Lendo cabeçalho…</div>
               ) : cab.colunas.length === 0 ? (
                 <div className="banner">Não encontrei colunas no cabeçalho. Confira a codificação abaixo.</div>
@@ -355,6 +413,70 @@ export default function ETL() {
                     <div className="banner" style={{ marginTop: 14, background: '#eafaf0', borderColor: '#bfe6cd' }}>
                       ✔ Pronto! Arquivo <b>{resultado.arquivo}</b> gravado.<br />
                       Linhas lidas: <b>{fmtNum(resultado.lidas)}</b> · mantidas: <b>{fmtNum(resultado.mantidas)}</b> · removidas: <b>{fmtNum(resultado.removidas)}</b>.
+                    </div>
+                  )}
+                </>
+              ))}
+
+              {modo === 'sql' && (
+                <>
+                  <div className="acoes" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn-secundario" onClick={() => setSql(SQL_RECORTE_CLT)}>Recorte do mês (CLT)</button>
+                    <button className="btn-refresh" onClick={() => setSql('SELECT * FROM base LIMIT 100')}>Amostra (100 linhas)</button>
+                    {duckColunas && <button className="btn-refresh" onClick={() => setSql('SELECT count(*) AS linhas FROM base')}>Contar linhas</button>}
+                  </div>
+
+                  <textarea
+                    value={sql}
+                    onChange={(e) => setSql(e.target.value)}
+                    spellCheck={false}
+                    style={{ width: '100%', minHeight: 180, marginTop: 12, fontFamily: 'ui-monospace,Menlo,Consolas,monospace', fontSize: 13, lineHeight: 1.5, padding: 12, borderRadius: 10, border: '1px solid #d7dcea', resize: 'vertical' }}
+                  />
+
+                  <div className="acoes" style={{ marginTop: 10 }}>
+                    <button className="btn-primario" onClick={rodar} disabled={duckRodando || duckCarregando}>
+                      {duckCarregando ? 'Abrindo no DuckDB…' : duckRodando ? 'Rodando…' : 'Rodar'}
+                    </button>
+                    <button className="btn-secundario" onClick={exportar} disabled={duckRodando || duckCarregando}>Exportar CSV</button>
+                    <span className="ajuda" style={{ margin: 0 }}>A tabela virtual chama-se <span className="mono">base</span>. O arquivo é lido direto do disco, sem carregar tudo na memória.</span>
+                  </div>
+
+                  {duckColunas && (
+                    <p className="ajuda" style={{ marginTop: 10 }}>
+                      <b>Colunas detectadas:</b>{' '}
+                      {duckColunas.map((c, i) => (
+                        <span key={i} className="mono" style={{ display: 'inline-block', background: '#eef1f8', borderRadius: 6, padding: '1px 6px', margin: '2px 4px 2px 0' }}>
+                          {c.nome}<span style={{ color: '#98a' }}> · {c.tipo}</span>
+                        </span>
+                      ))}
+                    </p>
+                  )}
+
+                  {duckErro && <div className="banner" style={{ marginTop: 12 }}>{duckErro}</div>}
+
+                  {duckExportado && (
+                    <div className="banner" style={{ marginTop: 12, background: '#eafaf0', borderColor: '#bfe6cd' }}>
+                      ✔ Exportado: <b>{duckExportado}</b>.
+                    </div>
+                  )}
+
+                  {duckRes && (
+                    <div style={{ marginTop: 14 }}>
+                      <p className="ajuda">
+                        <b>{fmtNum(duckRes.total)}</b> linha(s) no resultado · {duckRes.ms} ms
+                        {duckRes.total > duckRes.linhas.length ? ` · mostrando as primeiras ${fmtNum(duckRes.linhas.length)}` : ''}.
+                      </p>
+                      <div className="preview-wrap" style={{ maxHeight: 380, overflow: 'auto' }}>
+                        <table className="preview">
+                          <thead><tr>{duckRes.colunas.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+                          <tbody>
+                            {duckRes.linhas.map((r, i) => (
+                              <tr key={i}>{duckRes.colunas.map((c) => <td key={c} className="mono">{r[c] == null ? '' : String(r[c])}</td>)}</tr>
+                            ))}
+                            {duckRes.linhas.length === 0 && <tr><td colSpan={duckRes.colunas.length || 1} className="empty">Nenhuma linha no resultado.</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </>
