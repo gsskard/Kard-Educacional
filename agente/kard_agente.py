@@ -54,7 +54,7 @@ def cortar(texto):
 
 
 class Painel:
-    """Conversa com os webhooks /rpa/agente/* do n8n."""
+    """Conversa com os webhooks /rpa-agente/* do n8n."""
 
     def __init__(self, base, token, nome, timeout=30):
         self.base = base.rstrip("/")
@@ -75,7 +75,7 @@ class Painel:
         return json.loads(texto) if texto else None
 
     def ping(self):
-        return self.post("/rpa/agente/ping", {
+        return self.post("/rpa-agente/ping", {
             "so": f"{platform.system()} {platform.release()}",
             "versao": VERSAO,
             "python": platform.python_version(),
@@ -84,7 +84,7 @@ class Painel:
 
     def puxar(self):
         """Próxima execução na fila desta máquina, ou None."""
-        r = self.post("/rpa/agente/puxar", {})
+        r = self.post("/rpa-agente/puxar", {})
         if isinstance(r, list):
             r = r[0] if r else None
         if not r or not r.get("execucao_id"):
@@ -92,7 +92,7 @@ class Painel:
         return r
 
     def resultado(self, execucao_id, status, saida, erro, codigo_saida, duracao_ms):
-        return self.post("/rpa/agente/resultado", {
+        return self.post("/rpa-agente/resultado", {
             "execucao_id": execucao_id,
             "status": status,
             "saida": cortar(saida),

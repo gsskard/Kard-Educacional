@@ -287,8 +287,8 @@ function PainelExecucoes({ job, execucoes, carregando, aoFechar, aoAtualizar, ao
                     {ex.agente && <span>agente: {ex.agente}</span>}
                     {ex.codigo_saida != null && <span>código de saída: {ex.codigo_saida}</span>}
                     {ex.tentativa > 1 && <span>tentativa {ex.tentativa}</span>}
-                    {ex.emAndamento && (
-                      <button className="btn-mini" onClick={() => aoCancelar(ex.id)}>Cancelar</button>
+                    {ex.status === 'fila' && (
+                      <button className="btn-mini" onClick={() => aoCancelar(ex.id)}>Tirar da fila</button>
                     )}
                   </div>
                   <pre className="rpa-log">{ex.log}</pre>

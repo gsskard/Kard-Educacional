@@ -27,10 +27,6 @@ export class ExecucaoRpa {
     this.tentativa = Number(bruto.tentativa) || 1
   }
 
-  get emAndamento() {
-    return this.status === 'fila' || this.status === 'rodando'
-  }
-
   get rotulo() {
     return (STATUS_EXEC[this.status] || STATUS_EXEC.fila).label
   }
