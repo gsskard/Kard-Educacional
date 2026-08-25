@@ -12,6 +12,7 @@ const MENU = [
   { rota: 'empresas', label: 'Empresas' },
   { rota: 'obitos', label: 'Óbitos' },
   { rota: 'inbox', label: 'Inbox' },
+  { rota: 'rpa', label: 'RPA' },
 ]
 
 function Logo() {

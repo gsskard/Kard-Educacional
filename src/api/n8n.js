@@ -11,6 +11,7 @@ import { listasService } from '../services/ListasService'
 import { empresasService } from '../services/EmpresasService'
 import { rhService } from '../services/RhService'
 import { obitosService } from '../services/ObitosService'
+import { rpaService } from '../services/RpaService'
 
 // --- Cobrança / contatos ---
 export const listarContatos = () => cobrancaService.listarContatos()
@@ -58,6 +59,17 @@ export const saldosPlataformas = () => rhService.saldosPlataformas()
 export function listarEventos() {
   throw new Error('PENDENTE: criar webhook de eventos no n8n (RF-40)')
 }
+
+// --- RPA (jobs de automação: Python/Node/bash na nuvem ou em agente local) ---
+export const listarJobsRpa = () => rpaService.listarJobs()
+export const salvarJobRpa = (job) => rpaService.salvarJob(job)
+export const apagarJobRpa = (id) => rpaService.apagarJob(id)
+export const ativarJobRpa = (id, ativo) => rpaService.ativarJob(id, ativo)
+export const executarJobRpa = (id) => rpaService.executarJob(id)
+export const listarExecucoesRpa = (jobId, limite) => rpaService.listarExecucoes(jobId, limite)
+export const lerExecucaoRpa = (id) => rpaService.lerExecucao(id)
+export const cancelarExecucaoRpa = (id) => rpaService.cancelarExecucao(id)
+export const listarAgentesRpa = () => rpaService.listarAgentes()
 
 export const API = api.base
 

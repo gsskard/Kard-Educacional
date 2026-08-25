@@ -44,7 +44,10 @@ src/
 ├─ services/                ApiClient · CobrancaService · EmpresasService
 ├─ models/                  Contato · Empresa
 ├─ componentes/             Layout (sidebar) · CompanyLogo · PillStatus
-└─ telas/                   Dashboard · TelaEtapa · Contatos · Empresas · Configuracoes
+└─ telas/                   Dashboard · TelaEtapa · Contatos · Empresas · Rpa · Configuracoes
+
+agente/                     agente de RPA em Python (roda os jobs na máquina)
+docs/RPA.md                 arquitetura e contrato da tela RPA
 ```
 
 ## Telas
@@ -54,6 +57,10 @@ src/
   o que muda é a config vinda de `config/etapas.js`. Educacional tem seletor de modelo de e-mail.
 - **Contatos** — base de contatos cruzada com as empresas (logo + status de enriquecimento).
 - **Empresas** — empresas enriquecidas (Hunter) + aba **Validação de domínio em lote** (CNPJ + IA).
+- **RPA** — jobs de automação em Python/Node/shell, agendados por cron. O n8n
+  guarda os jobs e a fila; quem executa é o **agente** (`agente/kard_agente.py`),
+  instalado na máquina da pessoa ou num servidor sempre ligado. Detalhes em
+  [`docs/RPA.md`](docs/RPA.md).
 - **Configurações** — inboxes por etapa e integrações (esqueleto).
 
 ## Convenções
