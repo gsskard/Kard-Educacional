@@ -99,6 +99,9 @@ export default function ETL() {
   const [duckErro, setDuckErro] = useState('')
   const [duckRes, setDuckRes] = useState(null) // { colunas, linhas, total, ms }
   const [duckExportado, setDuckExportado] = useState('')
+  const [duckEnc, setDuckEnc] = useState('')    // '' = auto, 'utf-8', 'latin-1'
+  const [duckDelim, setDuckDelim] = useState('') // '' = auto, ';', ',', '\\t'
+  const [duckMeta, setDuckMeta] = useState(null) // { encoding, delim } efetivos
 
   // ao abrir, tenta recuperar a pasta já autorizada
   useEffect(() => {
@@ -163,7 +166,12 @@ export default function ETL() {
   }
 
   function resetDuck() {
-    setDuckBaseDe(null); setDuckColunas(null); setDuckRes(null); setDuckErro(''); setDuckExportado('')
+    setDuckBaseDe(null); setDuckColunas(null); setDuckRes(null); setDuckErro(''); setDuckExportado(''); setDuckMeta(null)
+  }
+
+  // trocar codificação/separador força reabrir a base com a nova opção
+  function trocarDuckOpt(setter, valor) {
+    setter(valor); setDuckBaseDe(null); setDuckColunas(null); setDuckRes(null)
   }
 
   // garante que o arquivo selecionado está registrado no DuckDB (view "base")
@@ -171,8 +179,8 @@ export default function ETL() {
     if (duckBaseDe === sel.nome && duckColunas) return
     setDuckCarregando(true); setDuckErro('')
     try {
-      const { colunas } = await abrirBase(sel.handle)
-      setDuckColunas(colunas); setDuckBaseDe(sel.nome)
+      const meta = await abrirBase(sel.handle, { encoding: duckEnc || undefined, delim: duckDelim || undefined })
+      setDuckColunas(meta.colunas); setDuckMeta({ encoding: meta.encoding, delim: meta.delim }); setDuckBaseDe(sel.nome)
     } finally {
       setDuckCarregando(false)
     }
@@ -426,6 +434,27 @@ export default function ETL() {
                     {duckColunas && <button className="btn-refresh" onClick={() => setSql('SELECT count(*) AS linhas FROM base')}>Contar linhas</button>}
                   </div>
 
+                  <div className="acoes" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
+                    <div className="campo-modelo" style={{ margin: 0 }}>
+                      <label>Codificação</label>
+                      <select value={duckEnc} onChange={(e) => trocarDuckOpt(setDuckEnc, e.target.value)}>
+                        <option value="">Auto</option>
+                        <option value="utf-8">UTF-8</option>
+                        <option value="latin-1">Latin-1 / Windows-1252</option>
+                      </select>
+                    </div>
+                    <div className="campo-modelo" style={{ margin: 0 }}>
+                      <label>Separador</label>
+                      <select value={duckDelim} onChange={(e) => trocarDuckOpt(setDuckDelim, e.target.value)}>
+                        <option value="">Auto</option>
+                        <option value=";">; (ponto e vírgula)</option>
+                        <option value=",">, (vírgula)</option>
+                        <option value="\t">tab</option>
+                        <option value="|">| (pipe)</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <textarea
                     value={sql}
                     onChange={(e) => setSql(e.target.value)}
@@ -443,7 +472,7 @@ export default function ETL() {
 
                   {duckColunas && (
                     <p className="ajuda" style={{ marginTop: 10 }}>
-                      <b>Colunas detectadas:</b>{' '}
+                      <b>Colunas detectadas</b>{duckMeta ? ` (codificação ${duckMeta.encoding}, separador ${duckMeta.delim === '\t' ? 'tab' : duckMeta.delim}):` : ':'}{' '}
                       {duckColunas.map((c, i) => (
                         <span key={i} className="mono" style={{ display: 'inline-block', background: '#eef1f8', borderRadius: 6, padding: '1px 6px', margin: '2px 4px 2px 0' }}>
                           {c.nome}<span style={{ color: '#98a' }}> · {c.tipo}</span>

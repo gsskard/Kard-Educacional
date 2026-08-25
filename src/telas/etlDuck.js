@@ -29,19 +29,29 @@ async function getDb() {
 const FILE = 'base.csv'
 const semPontoVirgula = (sql) => sql.trim().replace(/;\s*$/, '')
 
-// Registra o arquivo local e cria a VIEW "base" (com detecção automática de tipos).
-// Retorna as colunas detectadas pra tela mostrar ao usuário.
-export async function abrirBase(fileHandle) {
+// Adivinha a codificação lendo os primeiros 2 MB: se não for UTF-8 válido
+// (acento de nome quebra o decode), assume Latin-1 (padrão de arquivo de banco).
+export async function sniffEncoding(file) {
+  const buf = await file.slice(0, 2 * 1024 * 1024).arrayBuffer()
+  try { new TextDecoder('utf-8', { fatal: true }).decode(buf); return 'utf-8' } catch { return 'latin-1' }
+}
+
+// Registra o arquivo local e cria a VIEW "base" (detecção automática de tipos).
+// opts.encoding: 'utf-8' | 'latin-1' | undefined (auto). opts.delim: ';' | ',' | '\t' | undefined (auto).
+// Retorna colunas detectadas + a codificação/separador efetivamente usados.
+export async function abrirBase(fileHandle, opts = {}) {
   const db = await getDb()
   const file = await fileHandle.getFile()
+  const encoding = opts.encoding || await sniffEncoding(file)
   try { await db.dropFile(FILE) } catch { /* ainda não registrado */ }
   await db.registerFileHandle(FILE, file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
   const conn = await db.connect()
   try {
-    await conn.query(`CREATE OR REPLACE VIEW base AS SELECT * FROM read_csv_auto('${FILE}', header=true)`)
+    const delim = opts.delim ? `, delim='${opts.delim === '\\t' ? '\t' : opts.delim}'` : ''
+    await conn.query(`CREATE OR REPLACE VIEW base AS SELECT * FROM read_csv_auto('${FILE}', header=true, encoding='${encoding}'${delim})`)
     const info = await conn.query('DESCRIBE base')
     const colunas = info.toArray().map((r) => ({ nome: r.column_name, tipo: r.column_type }))
-    return { colunas }
+    return { colunas, encoding, delim: opts.delim || 'auto' }
   } finally {
     await conn.close()
   }
