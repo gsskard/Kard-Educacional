@@ -363,9 +363,9 @@ export default function ETL() {
                 o arquivo é lido em blocos, nada sobe pra nuvem — então tamanho e privacidade (CPF) não são problema.
               </p>
 
-              <div className="acoes" style={{ gap: 8, marginBottom: 12 }}>
-                <button className={'btn-refresh' + (modo === 'sql' ? ' ativo' : '')} onClick={() => setModo('sql')}>SQL (DuckDB)</button>
-                <button className={'btn-refresh' + (modo === 'simples' ? ' ativo' : '')} onClick={() => setModo('simples')}>Filtrar (simples)</button>
+              <div className="etl-tabs">
+                <button className={'etl-tab' + (modo === 'sql' ? ' ativo' : '')} onClick={() => setModo('sql')}>SQL (DuckDB)</button>
+                <button className={'etl-tab' + (modo === 'simples' ? ' ativo' : '')} onClick={() => setModo('simples')}>Filtrar (simples)</button>
               </div>
 
               {modo === 'simples' && (!cab ? null : cab.colunas === null ? (
@@ -453,74 +453,84 @@ export default function ETL() {
 
               {modo === 'sql' && (
                 <>
-                  <div className="acoes" style={{ gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn-secundario" onClick={() => setSql(SQL_RECORTE_CLT)}>Recorte do mês (CLT)</button>
-                    <button className="btn-refresh" onClick={() => setSql('SELECT * FROM base LIMIT 100')}>Amostra (100 linhas)</button>
-                    {duckColunas && <button className="btn-refresh" onClick={() => setSql('SELECT count(*) AS linhas FROM base')}>Contar linhas</button>}
-                  </div>
-
-                  <div className="acoes" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
-                    <div className="campo-modelo" style={{ margin: 0 }}>
-                      <label>Codificação</label>
-                      <select value={duckEnc} onChange={(e) => trocarDuckOpt(setDuckEnc, e.target.value)}>
-                        <option value="">Auto</option>
-                        <option value="utf-8">UTF-8</option>
-                        <option value="latin-1">Latin-1 / Windows-1252</option>
-                      </select>
+                  <div className="etl-panel">
+                    <div className="etl-panel-cab"><h3>Leitura do arquivo</h3></div>
+                    <div className="acoes" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 0 }}>
+                      <div className="campo-modelo" style={{ margin: 0 }}>
+                        <label>Codificação</label>
+                        <select value={duckEnc} onChange={(e) => trocarDuckOpt(setDuckEnc, e.target.value)}>
+                          <option value="">Auto</option>
+                          <option value="utf-8">UTF-8</option>
+                          <option value="latin-1">Latin-1 / Windows-1252</option>
+                        </select>
+                      </div>
+                      <div className="campo-modelo" style={{ margin: 0 }}>
+                        <label>Separador</label>
+                        <select value={duckDelim} onChange={(e) => trocarDuckOpt(setDuckDelim, e.target.value)}>
+                          <option value="">Auto</option>
+                          <option value=";">; (ponto e vírgula)</option>
+                          <option value=",">, (vírgula)</option>
+                          <option value="\t">tab</option>
+                          <option value="|">| (pipe)</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="campo-modelo" style={{ margin: 0 }}>
-                      <label>Separador</label>
-                      <select value={duckDelim} onChange={(e) => trocarDuckOpt(setDuckDelim, e.target.value)}>
-                        <option value="">Auto</option>
-                        <option value=";">; (ponto e vírgula)</option>
-                        <option value=",">, (vírgula)</option>
-                        <option value="\t">tab</option>
-                        <option value="|">| (pipe)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <textarea
-                    value={sql}
-                    onChange={(e) => setSql(e.target.value)}
-                    spellCheck={false}
-                    style={{ width: '100%', minHeight: 180, marginTop: 12, fontFamily: 'ui-monospace,Menlo,Consolas,monospace', fontSize: 13, lineHeight: 1.5, padding: 12, borderRadius: 10, border: '1px solid #d7dcea', resize: 'vertical' }}
-                  />
-
-                  <div className="acoes" style={{ marginTop: 10 }}>
-                    <button className="btn-primario" onClick={rodar} disabled={duckRodando || duckCarregando}>
-                      {duckCarregando ? 'Abrindo no DuckDB…' : duckRodando ? 'Rodando…' : 'Rodar'}
-                    </button>
-                    <button className="btn-secundario" onClick={exportar} disabled={duckRodando || duckCarregando}>Exportar CSV</button>
-                    <span className="ajuda" style={{ margin: 0 }}>A tabela virtual chama-se <span className="mono">base</span>. O arquivo é lido direto do disco, sem carregar tudo na memória.</span>
-                  </div>
-
-                  {duckColunas && (
-                    <p className="ajuda" style={{ marginTop: 10 }}>
-                      <b>Colunas detectadas</b>{duckMeta ? ` (codificação ${duckMeta.encoding}, separador ${duckMeta.delim === '\t' ? 'tab' : duckMeta.delim}):` : ':'}{' '}
-                      {duckColunas.map((c, i) => (
-                        <span key={i} className="mono" style={{ display: 'inline-block', background: '#eef1f8', borderRadius: 6, padding: '1px 6px', margin: '2px 4px 2px 0' }}>
-                          {c.nome}<span style={{ color: '#98a' }}> · {c.tipo}</span>
+                    {duckColunas ? (
+                      <div style={{ marginTop: 14 }}>
+                        <span className="etl-rotulo">
+                          Colunas detectadas{duckMeta ? ` · ${duckMeta.encoding}, separador ${duckMeta.delim === '\t' ? 'tab' : duckMeta.delim}` : ''}
                         </span>
-                      ))}
-                    </p>
-                  )}
+                        <div className="etl-cols">
+                          {duckColunas.map((c, i) => (
+                            <span key={i} className="etl-col-chip">{c.nome}<small>{c.tipo}</small></span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="ajuda" style={{ marginTop: 12, marginBottom: 0 }}>As colunas aparecem aqui depois de rodar a 1ª consulta.</p>
+                    )}
+                  </div>
 
-                  {duckErro && <div className="banner" style={{ marginTop: 12 }}>{duckErro}</div>}
+                  <div className="etl-panel">
+                    <div className="etl-panel-cab"><h3>Consulta</h3></div>
+                    <span className="etl-rotulo">Modelos</span>
+                    <div className="etl-modelos">
+                      <button className="etl-chip destaque" onClick={() => setSql(SQL_RECORTE_CLT)}>Recorte do mês (CLT)</button>
+                      <button className="etl-chip" onClick={() => setSql('SELECT * FROM base LIMIT 100')}>Amostra (100 linhas)</button>
+                      {duckColunas && <button className="etl-chip" onClick={() => setSql('SELECT count(*) AS linhas FROM base')}>Contar linhas</button>}
+                    </div>
+
+                    <span className="etl-rotulo" style={{ marginTop: 16 }}>
+                      SQL <span style={{ textTransform: 'none', fontWeight: 400, letterSpacing: 0, color: 'var(--muted)' }}>— a tabela chama-se <span className="mono">base</span></span>
+                    </span>
+                    <textarea className="etl-sql" value={sql} onChange={(e) => setSql(e.target.value)} spellCheck={false} />
+
+                    <div className="acoes" style={{ marginTop: 12 }}>
+                      <button className="btn-primario" onClick={rodar} disabled={duckRodando || duckCarregando}>
+                        {duckCarregando ? 'Abrindo no DuckDB…' : duckRodando ? 'Rodando…' : '▶ Rodar'}
+                      </button>
+                      <button className="btn-secundario" onClick={exportar} disabled={duckRodando || duckCarregando}>Exportar CSV</button>
+                    </div>
+                  </div>
+
+                  {duckErro && <div className="banner" style={{ marginTop: 14 }}>{duckErro}</div>}
 
                   {duckExportado && (
-                    <div className="banner" style={{ marginTop: 12, background: '#eafaf0', borderColor: '#bfe6cd' }}>
+                    <div className="banner" style={{ marginTop: 14, background: '#eafaf0', borderColor: '#bfe6cd' }}>
                       ✔ Exportado: <b>{duckExportado}</b>.
                     </div>
                   )}
 
                   {duckRes && (
-                    <div style={{ marginTop: 14 }}>
-                      <p className="ajuda">
-                        <b>{fmtNum(duckRes.total)}</b> linha(s) no resultado · {duckRes.ms} ms
-                        {duckRes.total > duckRes.linhas.length ? ` · mostrando as primeiras ${fmtNum(duckRes.linhas.length)}` : ''}.
-                      </p>
-                      <div className="preview-wrap" style={{ maxHeight: 380, overflow: 'auto' }}>
+                    <div className="etl-panel" style={{ marginTop: 14 }}>
+                      <div className="etl-panel-cab">
+                        <h3>Resultado</h3>
+                        <span className="ajuda" style={{ margin: 0 }}>
+                          <b>{fmtNum(duckRes.total)}</b> linha(s) · {duckRes.ms} ms
+                          {duckRes.total > duckRes.linhas.length ? ` · 1ªs ${fmtNum(duckRes.linhas.length)}` : ''}
+                        </span>
+                      </div>
+                      <div className="preview-wrap" style={{ maxHeight: 380, overflow: 'auto', background: '#fff', borderRadius: 10, border: '1px solid var(--borda)' }}>
                         <table className="preview">
                           <thead><tr>{duckRes.colunas.map((c) => <th key={c}>{c}</th>)}</tr></thead>
                           <tbody>

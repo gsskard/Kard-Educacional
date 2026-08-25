@@ -838,3 +838,27 @@ table.sub td { padding: 8px 12px; border-bottom: 1px solid var(--borda); }
 .etl-step.etl-pendente { opacity: .65; }
 .secao.secao-ativa { border-color: var(--verde); box-shadow: 0 0 0 2px rgba(34,197,94,.16); }
 @media (max-width: 700px) { .etl-step { flex: 1 1 100%; } }
+
+/* ETL — etapa "Tratar": tabs segmentadas, painéis e chips */
+.etl-tabs { display: inline-flex; gap: 4px; background: #eef1f8; border: 1px solid var(--borda); border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.etl-tab { border: none; background: transparent; color: var(--muted); font-weight: 600; font-size: 13.5px; padding: 8px 16px; border-radius: 9px; cursor: pointer; transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
+.etl-tab:hover { color: var(--navy-800); }
+.etl-tab.ativo { background: #fff; color: var(--navy-800); box-shadow: 0 1px 3px rgba(30,43,77,.12); }
+
+.etl-panel { background: #f8fafc; border: 1px solid var(--borda); border-radius: 14px; padding: 16px 18px; margin-top: 14px; }
+.etl-panel-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.etl-panel-cab h3 { font-size: 12.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--navy-600); margin: 0; }
+.etl-rotulo { display: block; font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--navy-600); margin: 0 0 8px; }
+
+.etl-modelos { display: flex; flex-wrap: wrap; gap: 8px; }
+.etl-chip { background: #fff; border: 1px solid var(--borda); color: var(--navy-800); font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 999px; cursor: pointer; transition: border-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease; }
+.etl-chip:hover { border-color: var(--verde); color: var(--verde-600); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(34,197,94,.14); }
+.etl-chip.destaque { background: var(--verde); border-color: var(--verde); color: #fff; }
+.etl-chip.destaque:hover { background: var(--verde-600); color: #fff; }
+
+.etl-sql { width: 100%; min-height: 180px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.55; padding: 14px; border-radius: 12px; border: 1px solid #d7dcea; background: #fff; color: var(--navy-800); resize: vertical; }
+.etl-sql:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(34,197,94,.12); }
+
+.etl-cols { display: flex; flex-wrap: wrap; gap: 6px; }
+.etl-col-chip { display: inline-flex; align-items: baseline; gap: 5px; background: #fff; border: 1px solid var(--borda); border-radius: 8px; padding: 3px 9px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--navy-800); }
+.etl-col-chip small { color: var(--muted); font-size: 11px; }
