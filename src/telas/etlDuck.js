@@ -86,6 +86,29 @@ export async function rodarSql(sql, limitePreview = 200) {
   }
 }
 
+// Coleta TODAS as linhas do resultado (o rodarSql só traz o preview) para enviar
+// a algum destino. Cap de segurança pra não estourar a memória em resultados enormes.
+export async function coletarLinhas(sql, max = 200000) {
+  const db = await getDb()
+  const conn = await db.connect()
+  const clean = semPontoVirgula(sql)
+  try {
+    const res = await conn.query(`SELECT * FROM (${clean}) LIMIT ${max}`)
+    const linhas = res.toArray().map((r) => {
+      const o = r.toJSON()
+      for (const k of Object.keys(o)) {
+        const v = o[k]
+        if (typeof v === 'bigint') o[k] = v.toString()
+        else if (v instanceof Date) o[k] = v.toISOString().slice(0, 10)
+      }
+      return o
+    })
+    return linhas
+  } finally {
+    await conn.close()
+  }
+}
+
 // Exporta o resultado do SQL como CSV. O DuckDB grava num arquivo virtual (COPY)
 // e devolvemos o buffer, que é escrito no arquivo escolhido pelo usuário.
 export async function exportarSql(sql, sugestaoNome = 'recorte.csv') {

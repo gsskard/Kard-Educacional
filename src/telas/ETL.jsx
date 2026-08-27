@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { lerCabecalho, processarArquivo } from './etlStreaming'
-import { abrirBase, rodarSql, exportarSql, SQL_RECORTE_CLT } from './etlDuck'
+import { abrirBase, rodarSql, exportarSql, coletarLinhas, SQL_RECORTE_CLT } from './etlDuck'
+import { salvarResultadoEtl } from '../api/n8n'
 
 // Tela ETL — conecta uma PASTA LOCAL/DE REDE via File System Access API
 // (ex.: Z: \\192.168.137.5\FIFileSync\Producao) e lista os arquivos que as
@@ -127,7 +128,11 @@ export default function ETL() {
 
   // queries salvas + regras/agendamento
   const [queries, setQueries] = useState(() => carregarQueries())
-  const [formSalvar, setFormSalvar] = useState(null) // { nome, prefixo, auto, intervalo } | null
+  const [formSalvar, setFormSalvar] = useState(null) // { nome, prefixo, auto, intervalo, salvarN8n } | null
+
+  // envio do resultado pro n8n (Data Table)
+  const [salvandoN8n, setSalvandoN8n] = useState(false)
+  const [msgN8n, setMsgN8n] = useState('')
 
   // ao abrir, tenta recuperar a pasta já autorizada
   useEffect(() => {
@@ -248,7 +253,7 @@ export default function ETL() {
     })
   }
   function abrirFormSalvar() {
-    setFormSalvar({ nome: '', prefixo: sel ? chaveModelo(sel.nome) : '', auto: false, intervalo: 0 })
+    setFormSalvar({ nome: '', prefixo: sel ? chaveModelo(sel.nome) : '', auto: false, intervalo: 0, salvarN8n: false })
   }
   function salvarQueryAtual() {
     const nome = (formSalvar.nome || '').trim()
@@ -258,6 +263,7 @@ export default function ETL() {
       prefixo: (formSalvar.prefixo || '').trim(),
       auto: !!formSalvar.auto,
       intervaloMin: Math.max(0, Number(formSalvar.intervalo) || 0),
+      salvarN8n: !!formSalvar.salvarN8n,
     }
     setQueries((prev) => { const next = [...prev, q]; persistQueries(next); return next })
     setFormSalvar(null)
@@ -267,6 +273,22 @@ export default function ETL() {
   }
   function excluirQuery(id) {
     setQueries((prev) => { const next = prev.filter((q) => q.id !== id); persistQueries(next); return next })
+  }
+
+  // envia o resultado COMPLETO (não só o preview) pro n8n gravar na Data Table
+  async function enviarResultadoN8n(sqlText, regra, arquivo) {
+    setSalvandoN8n(true); setMsgN8n('')
+    try {
+      const linhas = await coletarLinhas(sqlText)
+      const r = await salvarResultadoEtl({ regra: regra || 'ad-hoc', arquivo: arquivo || '', linhas: linhas.length, dados: JSON.stringify(linhas) })
+      setMsgN8n(`✔ Salvo no n8n${r?.id ? ` (registro ${r.id})` : ''} — ${fmtNum(linhas.length)} linhas.`)
+      return true
+    } catch (e) {
+      setMsgN8n('⚠ Falha ao salvar no n8n: ' + (e?.message || e))
+      return false
+    } finally {
+      setSalvandoN8n(false)
+    }
   }
 
   // roda uma query salva: acha o arquivo mais recente da regra, abre no DuckDB e executa
@@ -282,6 +304,10 @@ export default function ETL() {
       const r = await rodarSql(q.sql)
       setDuckRes(r)
       marcarStatus(q.id, { quando: Date.now(), arquivo: arq.nome, total: r.total, erro: null })
+      if (q.salvarN8n) {
+        const ok = await enviarResultadoN8n(q.sql, q.nome, arq.nome)
+        marcarStatus(q.id, { salvoN8n: ok ? Date.now() : null })
+      }
     } catch (e) {
       setDuckErro(`Erro na query "${q.nome}": ` + (e?.message || e))
       marcarStatus(q.id, { quando: Date.now(), arquivo: arq.nome, erro: String(e?.message || e) })
@@ -473,6 +499,7 @@ export default function ETL() {
                     <div className="ajuda" style={{ margin: '4px 0' }}>
                       Arquivo começa com <span className="mono">{q.prefixo || '(qualquer)'}</span>
                       {q.auto && q.intervaloMin ? ` · re-checa a cada ${q.intervaloMin} min` : ''}
+                      {q.salvarN8n ? ' · 💾 salva no n8n' : ''}
                     </div>
                     {q.lastRun && (q.lastRun.quando || q.lastRun.erro) && (
                       <div className="ajuda" style={{ margin: '4px 0', color: q.lastRun.erro ? '#b4232a' : 'var(--verde-600)' }}>
@@ -669,6 +696,7 @@ export default function ETL() {
                               <input type="number" min="0" value={formSalvar.intervalo} onChange={(e) => setFormSalvar({ ...formSalvar, intervalo: e.target.value })} style={{ width: 130 }} />
                             </div>
                           )}
+                          <label className="etl-auto"><input type="checkbox" checked={formSalvar.salvarN8n} onChange={(e) => setFormSalvar({ ...formSalvar, salvarN8n: e.target.checked })} /> salvar resultado no n8n</label>
                         </div>
                         <div className="acoes" style={{ marginTop: 10 }}>
                           <button className="btn-primario" onClick={salvarQueryAtual} disabled={!formSalvar.nome.trim()}>Salvar</button>
@@ -694,6 +722,12 @@ export default function ETL() {
                           <b>{fmtNum(duckRes.total)}</b> linha(s) · {duckRes.ms} ms
                           {duckRes.total > duckRes.linhas.length ? ` · 1ªs ${fmtNum(duckRes.linhas.length)}` : ''}
                         </span>
+                      </div>
+                      <div className="acoes" style={{ marginTop: 0, marginBottom: 12 }}>
+                        <button className="btn-secundario" onClick={() => enviarResultadoN8n(sql, 'ad-hoc', duckBaseDe)} disabled={salvandoN8n}>
+                          {salvandoN8n ? 'Salvando…' : '💾 Salvar no n8n'}
+                        </button>
+                        {msgN8n && <span className="ajuda" style={{ margin: 0, color: msgN8n.startsWith('⚠') ? '#b4232a' : 'var(--verde-600)' }}>{msgN8n}</span>}
                       </div>
                       <div className="preview-wrap" style={{ maxHeight: 380, overflow: 'auto', background: '#fff', borderRadius: 10, border: '1px solid var(--borda)' }}>
                         <table className="preview">

@@ -12,6 +12,7 @@ import { empresasService } from '../services/EmpresasService'
 import { rhService } from '../services/RhService'
 import { obitosService } from '../services/ObitosService'
 import { empregadoresService } from '../services/EmpregadoresService'
+import { etlService } from '../services/EtlService'
 
 // --- Cobrança / contatos ---
 export const listarContatos = () => cobrancaService.listarContatos()
@@ -68,3 +69,6 @@ export const nvCheckCpf = (cpf) => obitosService.consultarCpf(cpf)
 // --- Teste de e-mail Empregadores (educativo) via CyberTalk ---
 export const enviarEmailEmpregadorTeste = (dados) => empregadoresService.enviarTeste(dados)
 export const lerEnviosEmpregador = () => empregadoresService.lerEnvios()
+
+// --- ETL: salvar resultado tratado no n8n (Data Table etl_resultados) ---
+export const salvarResultadoEtl = (dados) => etlService.salvarResultado(dados)
