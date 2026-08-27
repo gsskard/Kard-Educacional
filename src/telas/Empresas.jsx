@@ -162,6 +162,7 @@ export default function Empresas() {
   const [ordCol, setOrdCol] = useState(null)     // coluna de ordenação (null = ordem do back)
   const [ordDir, setOrdDir] = useState('asc')    // 'asc' | 'desc'
   const [filtroCor, setFiltroCor] = useState('todas') // 'todas' | 'verde' | 'ambar' | 'vermelho'
+  const [filtroEnr, setFiltroEnr] = useState('todas') // 'todas' | 'rh' | 'contatos' | 'sem'
   const [formEmp, setFormEmp] = useState(null)   // null | { modo:'novo'|'editar', cnpj, empresa, ... }
   const [salvandoEmp, setSalvandoEmp] = useState(false)
   const [desfazer, setDesfazer] = useState(null) // null | { cnpj, nome } — empresa recém-ocultada
@@ -284,9 +285,21 @@ export default function Empresas() {
     return c
   }, [porBusca])
 
-  // 2) aplica filtro de cor + ordenação por coluna
+  // classificação de enriquecimento (independente da confiança do domínio)
+  const temContatos = (e) => (Number(e.total_prospects) || 0) > 0
+  const temRh = (e) => (Number(e.total_rh) || 0) > 0
+  const semDados = (e) => !e.dominio && !temContatos(e)
+  const passaEnr = (e, k) => (k === 'rh' ? temRh(e) : k === 'contatos' ? temContatos(e) : k === 'sem' ? semDados(e) : true)
+  const contagemEnr = useMemo(() => ({
+    rh: porBusca.filter(temRh).length,
+    contatos: porBusca.filter(temContatos).length,
+    sem: porBusca.filter(semDados).length,
+  }), [porBusca])
+
+  // 2) aplica filtro de cor + enriquecimento + ordenação por coluna
   const visiveis = useMemo(() => {
     let arr = filtroCor === 'todas' ? porBusca : porBusca.filter((e) => corEmp(e) === filtroCor)
+    if (filtroEnr !== 'todas') arr = arr.filter((e) => passaEnr(e, filtroEnr))
     if (ordCol) {
       const num = COLS_NUM.includes(ordCol)
       const sinal = ordDir === 'asc' ? 1 : -1
@@ -297,7 +310,7 @@ export default function Empresas() {
       })
     }
     return arr
-  }, [porBusca, filtroCor, ordCol, ordDir])
+  }, [porBusca, filtroCor, filtroEnr, ordCol, ordDir])
 
   // Exporta a tabela (uma linha por contato de RH) em CSV que o Excel abre.
   // BOM UTF-8 pros acentos e ; como separador (padrão do Excel pt-BR).
@@ -456,6 +469,22 @@ export default function Empresas() {
             className={'fc-chip' + (filtroCor === k ? ' ativo' : '') + (k !== 'todas' ? ' conf-' + k : '')}
             onClick={() => setFiltroCor((cur) => (cur === k ? 'todas' : k))}>
             {k !== 'todas' && <i className="conf-dot" />}{txt} <b>{n}</b>
+          </button>
+        ))}
+      </div>
+
+      <div className="filtro-cor" style={{ marginTop: 8 }}>
+        <span className="fc-label">Enriquecimento:</span>
+        {[
+          { k: 'todas', txt: 'Todas', n: porBusca.length },
+          { k: 'rh', txt: 'Com RH', n: contagemEnr.rh },
+          { k: 'contatos', txt: 'Com contatos', n: contagemEnr.contatos },
+          { k: 'sem', txt: 'Sem dados', n: contagemEnr.sem },
+        ].map(({ k, txt, n }) => (
+          <button key={k}
+            className={'fc-chip' + (filtroEnr === k ? ' ativo' : '')}
+            onClick={() => setFiltroEnr((cur) => (cur === k ? 'todas' : k))}>
+            {txt} <b>{n}</b>
           </button>
         ))}
       </div>

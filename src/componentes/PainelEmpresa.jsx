@@ -1,7 +1,66 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CompanyLogo from './CompanyLogo'
-import { enriquecerEmpresa, sugerirDominios, rhRevelar } from '../api/n8n'
+import { enriquecerEmpresa, sugerirDominios, rhRevelar, lerEnviosEmpregador } from '../api/n8n'
 import { nomeProprio, formatarCnpj, confiancaDominio } from '../lib/formato'
+
+// Histórico de e-mail (CRM): casa o log real de disparos (empregador_envios)
+// com esta empresa por e-mail do contato, domínio ou nome.
+const MODELO_LABEL = { repasse: 'Repasse (dia 20)', escrituracao: 'Prazo de escrituração' }
+const rotuloModelo = (m) => MODELO_LABEL[m] || m || '—'
+const sucessoEnvio = (s) => s === 'enviado' || s === 'aceito_pela_api'
+const dataCurta = (d) => String(d || '').slice(0, 10).split('-').reverse().join('/')
+
+function HistoricoEmail({ empresa }) {
+  const [envios, setEnvios] = useState(null) // null = carregando
+  const [erro, setErro] = useState('')
+  useEffect(() => {
+    let vivo = true
+    lerEnviosEmpregador()
+      .then((d) => { if (vivo) setEnvios(d) })
+      .catch((e) => { if (vivo) { setErro(e.message); setEnvios([]) } })
+    return () => { vivo = false }
+  }, [])
+
+  const meus = useMemo(() => {
+    const lista = envios || []
+    const emails = new Set()
+    ;(empresa.rh_contatos || []).forEach((c) => c.email && emails.add(String(c.email).toLowerCase()))
+    if (empresa.email_receita) emails.add(String(empresa.email_receita).toLowerCase())
+    const dom = String(empresa.dominio || '').toLowerCase()
+    const nome = String(empresa.empresa || '').toLowerCase().trim()
+    return lista
+      .filter((ev) => {
+        const d = String(ev.destino || '').toLowerCase()
+        return emails.has(d) || (dom && d.endsWith('@' + dom)) || (nome && String(ev.nome || '').toLowerCase().trim() === nome)
+      })
+      .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
+  }, [envios, empresa])
+
+  return (
+    <div className="empresa-rh">
+      <div className="chave">Histórico de e-mail{envios && meus.length > 0 && <span className="tag-rh"> · {meus.length}</span>}</div>
+      {envios === null ? (
+        <small className="ajuda">carregando…</small>
+      ) : meus.length === 0 ? (
+        <small className="ajuda">{erro ? 'Não consegui ler o histórico (' + erro + ').' : 'Nenhum e-mail disparado para esta empresa ainda.'}</small>
+      ) : (
+        <div className="rh-lista">
+          {meus.map((h, i) => (
+            <div className="rh-linha" key={i}>
+              <span className="rh-info">
+                <span className="rh-nome">{rotuloModelo(h.modelo)}<span className="tag-socio-mini">{h.canal}</span></span>
+                <small className="rh-cargo">{h.destino} · {dataCurta(h.data)}</small>
+              </span>
+              <span className={'pill ' + (sucessoEnvio(h.status) ? 'pill-ok' : 'pill-erro')}>
+                {sucessoEnvio(h.status) ? (h.status === 'enviado' ? 'ENVIADO' : 'ACEITO') : 'FALHA'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Painel lateral ÚNICO (gaveta estilo HubSpot) com o "perfil" da empresa.
 // É autossuficiente: chama os serviços por dentro (desbloquear e-mail, trocar
@@ -310,6 +369,8 @@ export default function PainelEmpresa({ empresa, aoFechar, aoAtualizar }) {
               <span className="ajuda">Nenhum contato encontrado para este domínio.</span>
             )}
           </div>
+
+          <HistoricoEmail empresa={e} />
 
           <div className="acoes">
             <button className="btn-mini" onClick={reenriquecer}>reenriquecer</button>
